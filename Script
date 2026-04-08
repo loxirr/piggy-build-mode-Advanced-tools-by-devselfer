@@ -1,3 +1,19 @@
+--[[
+
+Script by devselfer
+Actual Version: 1.0.1
+
+Version 1.0.1 changes:
+toolgrid bug fixed
+movement tool bug fixed
+movement tool model updated
+added update logs
+
+Version 1.0.0 changes: published script with advanced scaling, advanced rotation
+advanced movement, etc
+
+]]
+
 print("starting inyecting")
 
 --roblox services
@@ -201,7 +217,7 @@ local ScreenGui = nil ::ScreenGui
 do		
 	ScreenGui = PlayerGui:WaitForChild("ScreenGui",3)
 	if ScreenGui then
-		
+
 	else
 		local function PutScreenGui(instances)
 			ScreenGui = instances["ScreenGui"]
@@ -3293,7 +3309,7 @@ do
 			instances["UICorner"].Parent = instances["ToolBar"]
 			instances["UIPadding"].Parent = instances["ToolBar"]
 			instances["ToolBar"].Parent = instances["ScreenGui"]
-			
+
 			PutScreenGui(instances)
 
 			table.clear(instances)
@@ -3473,75 +3489,54 @@ do
 		instances["Part"] = Instance.new("Part")
 		instances["Part"].Anchored = true
 		instances["Part"].BottomSurface = Enum.SurfaceType.Smooth
-		instances["Part"].CFrame = CFrame.new(3.21954, 7.46647, 1.86146)
+		instances["Part"].CFrame = CFrame.new(3.14296, 7.46647, 1.60126, -4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08)
 		instances["Part"].CanCollide = false
-		instances["Part"].Position = Vector3.new(3.21954, 7.46647, 1.86146)
+		instances["Part"].Orientation = Vector3.new(0, -90, 0)
+		instances["Part"].Position = Vector3.new(3.14296, 7.46647, 1.60126)
+		instances["Part"].Rotation = Vector3.new(0, -90, 0)
 		instances["Part"].Shape = Enum.PartType.CornerWedge
-		instances["Part"].Size = Vector3.new(0.18292, 0.36584, 0.18292)
+		instances["Part"].Size = Vector3.new(0.337473, 0.674946, 0.337473)
 		instances["Part"].TopSurface = Enum.SurfaceType.Smooth
 
 		instances["Part2"] = Instance.new("Part")
 		instances["Part2"].Anchored = true
 		instances["Part2"].BottomSurface = Enum.SurfaceType.Smooth
-		instances["Part2"].CFrame = CFrame.new(3.40081, 7.46647, 1.67854, -1, 8.74228e-08, 0, 8.74228e-08, 1, 8.74228e-08, 7.64274e-15, 8.74228e-08, -1)
+		instances["Part2"].CFrame = CFrame.new(3.47739, 7.46647, 1.93874, -4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08)
 		instances["Part2"].CanCollide = false
-		instances["Part2"].Orientation = Vector3.new(0, 180, 0)
-		instances["Part2"].Position = Vector3.new(3.40081, 7.46647, 1.67854)
-		instances["Part2"].Rotation = Vector3.new(180, 0, 180)
+		instances["Part2"].Orientation = Vector3.new(0, 90, 0)
+		instances["Part2"].Position = Vector3.new(3.47739, 7.46647, 1.93874)
+		instances["Part2"].Rotation = Vector3.new(0, 90, 0)
 		instances["Part2"].Shape = Enum.PartType.CornerWedge
-		instances["Part2"].Size = Vector3.new(0.18292, 0.36584, 0.18292)
+		instances["Part2"].Size = Vector3.new(0.337473, 0.674946, 0.337473)
 		instances["Part2"].TopSurface = Enum.SurfaceType.Smooth
 
 		instances["Part3"] = Instance.new("Part")
 		instances["Part3"].Anchored = true
 		instances["Part3"].BottomSurface = Enum.SurfaceType.Smooth
-		instances["Part3"].CFrame = CFrame.new(3.40081, 7.46647, 1.86146, -4.37114e-08, 0, 1, 0, 1, -0, -1, 0, -4.37114e-08)
+		instances["Part3"].CFrame = CFrame.new(3.47739, 7.46647, 1.60126, -1, 8.74228e-08, 0, 8.74228e-08, 1, 8.74228e-08, 7.10543e-15, 8.74228e-08, -1)
 		instances["Part3"].CanCollide = false
-		instances["Part3"].Orientation = Vector3.new(0, 90, 0)
-		instances["Part3"].Position = Vector3.new(3.40081, 7.46647, 1.86146)
-		instances["Part3"].Rotation = Vector3.new(0, 90, 0)
+		instances["Part3"].Orientation = Vector3.new(0, 180, 0)
+		instances["Part3"].Position = Vector3.new(3.47739, 7.46647, 1.60126)
+		instances["Part3"].Rotation = Vector3.new(180, 0, 180)
 		instances["Part3"].Shape = Enum.PartType.CornerWedge
-		instances["Part3"].Size = Vector3.new(0.18292, 0.36584, 0.18292)
+		instances["Part3"].Size = Vector3.new(0.337473, 0.674946, 0.337473)
 		instances["Part3"].TopSurface = Enum.SurfaceType.Smooth
 
 		instances["Part4"] = Instance.new("Part")
 		instances["Part4"].Anchored = true
 		instances["Part4"].BottomSurface = Enum.SurfaceType.Smooth
-		instances["Part4"].CFrame = CFrame.new(3.21954, 7.46647, 1.67854, -4.37114e-08, 0, -1, 0, 1, -0, 1, -0, -4.37114e-08)
+		instances["Part4"].CFrame = CFrame.new(3.14296, 7.46647, 1.93874)
 		instances["Part4"].CanCollide = false
-		instances["Part4"].Orientation = Vector3.new(0, -90, 0)
-		instances["Part4"].Position = Vector3.new(3.21954, 7.46647, 1.67854)
-		instances["Part4"].Rotation = Vector3.new(0, -90, 0)
+		instances["Part4"].Position = Vector3.new(3.14296, 7.46647, 1.93874)
 		instances["Part4"].Shape = Enum.PartType.CornerWedge
-		instances["Part4"].Size = Vector3.new(0.18292, 0.36584, 0.18292)
+		instances["Part4"].Size = Vector3.new(0.337473, 0.674946, 0.337473)
 		instances["Part4"].TopSurface = Enum.SurfaceType.Smooth
 
-		instances["Part5"] = Instance.new("Part")
-		instances["Part5"].Anchored = true
-		instances["Part5"].BottomSurface = Enum.SurfaceType.Smooth
-		instances["Part5"].CFrame = CFrame.new(3.31018, 6.33874, 1.77)
-		instances["Part5"].CanCollide = false
-		instances["Part5"].Position = Vector3.new(3.31018, 6.33874, 1.77)
-		instances["Part5"].Size = Vector3.new(0.1, 1.88961, 0.1)
-		instances["Part5"].TopSurface = Enum.SurfaceType.Smooth
-
-		instances["Part6"] = Instance.new("Part")
-		instances["Part6"].Anchored = true
-		instances["Part6"].BottomSurface = Enum.SurfaceType.Smooth
-		instances["Part6"].CFrame = CFrame.new(3.31018, 6.33874, 1.77)
-		instances["Part6"].CanCollide = false
-		instances["Part6"].Position = Vector3.new(3.31018, 6.33874, 1.77)
-		instances["Part6"].Size = Vector3.new(0.768112, 3.52283, 0.763298)
-		instances["Part6"].TopSurface = Enum.SurfaceType.Smooth
-		instances["Part6"].Transparency = 1
-
-		instances["Part6"].Parent = instances["Flecha"]
-		instances["Part5"].Parent = instances["Flecha"]
 		instances["Part4"].Parent = instances["Flecha"]
 		instances["Part3"].Parent = instances["Flecha"]
 		instances["Part2"].Parent = instances["Flecha"]
 		instances["Part"].Parent = instances["Flecha"]
-
+		
 		FlechaExample = instances["Flecha"]
 
 		table.clear(instances)
@@ -3830,7 +3825,7 @@ do
 						Clone:PivotTo(InitialCFrame * CFrame.new(0,Distance/15,0))
 					end
 				end
-				
+
 				CalculateDistance()
 
 				Clone:AddTag("Input")
@@ -3844,13 +3839,13 @@ do
 						child:AddTag("Input")
 					end
 				end
-				
+
 				local JanitorObject = Janitor.new()
-				
+
 				JanitorObject:Add(RunService.Heartbeat:Connect(function(Property)
 					CalculateDistance()
 				end))
-				
+
 				Clone.Destroying:Connect(function()
 					JanitorObject:Destroy()
 				end)
@@ -4136,9 +4131,9 @@ do
 						local ZIsMax = absZ > absX and absZ > absY
 
 						PositionResult = Vector3.new(
-							XIsMax and PositionResult.X or ((PositionResult.X // ToolGrid)*ToolGrid)+ToolGrid,
-							YIsMax and PositionResult.Y or ((PositionResult.Y // ToolGrid)*ToolGrid)+ToolGrid,
-							ZIsMax and PositionResult.Z or ((PositionResult.Z // ToolGrid)*ToolGrid)+ToolGrid
+							XIsMax and PositionResult.X or ((PositionResult.X // ToolGrid)*ToolGrid)+ToolGrid/2,
+							YIsMax and PositionResult.Y or ((PositionResult.Y // ToolGrid)*ToolGrid)+ToolGrid/2,
+							ZIsMax and PositionResult.Z or ((PositionResult.Z // ToolGrid)*ToolGrid)+ToolGrid/2
 						)
 					end
 
@@ -4478,7 +4473,7 @@ do
 				if IsZ then
 					DiferenceZ = RayCastPosition.Z-Position.Z
 				end
-				
+
 				return Vector3.new(DiferenceX,DiferenceY,DiferenceZ)
 			end
 
@@ -4563,7 +4558,7 @@ do
 								BuildFunctions.Move(ActualClicked,ActualFinalCframe)
 								ActualFinalCframe = nil
 							end
-							
+
 							if ActualInputTarget ~= TargetInput then
 								if ActualInputTarget then
 									for i, child in ipairs(ActualInputTarget:GetDescendants()) do
@@ -4616,9 +4611,9 @@ do
 								if PosDiference then
 
 									if ActualToolGridState then
-										
+
 										local function ApplyToolGrid(Number)
-											return ((Number // ToolGrid)*ToolGrid)+ToolGrid/2
+											return (Number // ToolGrid)*ToolGrid
 										end
 
 										PosDiference = Vector3.new(
@@ -4627,7 +4622,7 @@ do
 											ApplyToolGrid(PosDiference.Z)
 										)
 									end
-									
+
 									if MoveToolIsLocal then
 										ActualFinalCframe = StartCFrame*CFrame.new(PosDiference)
 									else
@@ -4710,14 +4705,14 @@ do
 				ActualInputTarget = nil
 				ActualFinalCframe = nil
 			end))
-			
+
 			AddToClean(Events.WorldStateChanged.Event:Connect(function()
 				if ActualState == "position" and Inputs then
 					Inputs = nil
 					RemoveBorders(ActualClicked)
 					CreateBorders(ActualClicked,ActualColors.Selected)
 					Inputs = CreateInputs(ActualClicked,ActualColors.NoSelected,FlechaExample,true,MoveToolIsLocal)
-					
+
 					if CframeCalculator then
 						CframeCalculator.Disconnect()
 						CframeCalculator = GetCFrameDiference(StartCframeInput,Normal,ActualClicked,MoveToolIsLocal)
@@ -4730,7 +4725,7 @@ do
 		do
 			local ActualTarget
 			local ActualClicked
-			
+
 			local Handles
 			local Adornee
 			local AnteriorModel
@@ -4739,7 +4734,7 @@ do
 				Selected = Color3.new(1, 0.701961, 0),
 				NoSelected = Color3.new(0.635294, 0.423529, 0),
 			}
-			
+
 			local function CreateHandles(Act)
 
 				if Handles then
@@ -4795,9 +4790,9 @@ do
 					if ActualToolGridState and ToolGrid > 0 then
 						distance = (distance // ToolGrid) * ToolGrid
 					end
-					
+
 					if CtlrPressingState then
-						
+
 						if ShiftPressingState then
 
 							local AxisNewSize
@@ -4853,16 +4848,16 @@ do
 							ResizeModel(Act,InitialSize,Adornee.Size)
 						end
 					else
-						
+
 						if ShiftPressingState then
-							
+
 							local AxisNewSize
 							local AxisInitialSize
 
 							local NewPositionX = 0
 							local NewPositionY = 0
 							local NewPositionZ = 0
-							
+
 							if Face == Enum.NormalId.Right then
 								AxisInitialSize = InitialSize.X
 								AxisNewSize = AxisInitialSize + distance
@@ -4912,7 +4907,7 @@ do
 									NewPositionZ -= -InitialSize.Z/2
 								end
 							end
-							
+
 							local NewScale = (AxisNewSize / AxisInitialSize)*InitialScale
 							if NewScale <= 0 then
 								NewScale = 0.001
@@ -4991,7 +4986,7 @@ do
 							ResizeModel(Act,InitialSize,Adornee.Size)
 						end
 					end
-					
+
 					LastDistance = distance
 					RemoveBorders(Act)
 					CreateBorders(Act,ActualColors.NoSelected)
@@ -5070,7 +5065,7 @@ do
 		do
 			local ActualTarget
 			local ActualClicked
-			
+
 			local Handles
 			local Adornee
 			local function CreateHandles(Act)
@@ -5083,7 +5078,7 @@ do
 					Adornee:Destroy()
 					Adornee = nil
 				end
-				
+
 				if not Act then
 					return
 				end
@@ -5102,7 +5097,7 @@ do
 				Handles = Instance.new("ArcHandles")
 				Handles.Parent = PlayerGui
 				Handles.Adornee = Adornee
-				
+
 				AddToClean(Handles.MouseButton1Up:Connect(function()
 					lastAngle = 0
 					BuildFunctions.Move(Act,ActualPivot)
@@ -5110,7 +5105,7 @@ do
 
 				AddToClean(Handles.MouseDrag:Connect(function(axis, angle)
 					local Vec
-					
+
 					if ActualToolGridState and ActualRotationGrid > 0 then
 						local actrot = math.rad(ActualRotationGrid)
 						angle = (angle // actrot)*actrot
@@ -5132,7 +5127,7 @@ do
 					Act:PivotTo(ActualPivot)
 					Adornee.CFrame = ActualPivot
 				end))
-				
+
 				AddToClean(Adornee)
 				AddToClean(Handles)
 			end
@@ -5916,32 +5911,32 @@ do
 		local IgnoreToolGridConn = ConfigureBoolean(Page:FindFirstChild("IgnoreToolGrid"))
 		local ToolGridConn = ConfigureSlider(Page:FindFirstChild("ToolGrid"))
 		local RotationConn = ConfigureSlider(Page:FindFirstChild("Rotation"))
-		
+
 		--ignore invisible blocks
 		IgnoreInvisibleBlocksConn.StateChanged.Event:Connect(function(State)
 			IgnoreInvisibleBlocks = State
 		end)
 		IgnoreInvisibleBlocksConn.SetState(IgnoreInvisibleBlocks)
-		
+
 		--movetoolstate
 		MoveToolStateConn.StateChanged.Event:Connect(function(State)
 			MoveToolIsLocal = State
 			Events.WorldStateChanged:Fire(State)
 		end)
 		MoveToolStateConn.SetState(MoveToolIsLocal)
-		
+
 		--ignore piggy hitboxs
 		IgnoreModelsHitboxsConn.StateChanged.Event:Connect(function(State)
 			IgnorePiggyHitboxs = State
 		end)
 		IgnoreModelsHitboxsConn.SetState(IgnorePiggyHitboxs)
-		
+
 		--toolgridstate
 		IgnoreToolGridConn.StateChanged.Event:Connect(function(State)
 			ActualToolGridState = State
 		end)
 		IgnoreToolGridConn.SetState(ActualToolGridState)		
-		
+
 		--toolgrid
 		ToolGridConn.Divisor = 10
 		ToolGridConn.MinNumber = 0.01
@@ -5956,7 +5951,7 @@ do
 			ToolGridConn.Update(TextBoxToolGrid.Text)
 			ToolGrid = ToolGridConn.Number
 		end)	
-		
+
 		--ActualRotation
 		RotationConn.Divisor = 1
 		RotationConn.MinNumber = 0
