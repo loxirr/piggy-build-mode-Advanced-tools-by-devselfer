@@ -4136,9 +4136,9 @@ do
 						local ZIsMax = absZ > absX and absZ > absY
 
 						PositionResult = Vector3.new(
-							XIsMax and PositionResult.X or ((PositionResult.X // ToolGrid)*ToolGrid),
-							YIsMax and PositionResult.Y or ((PositionResult.Y // ToolGrid)*ToolGrid),
-							ZIsMax and PositionResult.Z or ((PositionResult.Z // ToolGrid)*ToolGrid)
+							XIsMax and PositionResult.X or ((PositionResult.X // ToolGrid)*ToolGrid)+ToolGrid,
+							YIsMax and PositionResult.Y or ((PositionResult.Y // ToolGrid)*ToolGrid)+ToolGrid,
+							ZIsMax and PositionResult.Z or ((PositionResult.Z // ToolGrid)*ToolGrid)+ToolGrid
 						)
 					end
 
@@ -4618,7 +4618,7 @@ do
 									if ActualToolGridState then
 										
 										local function ApplyToolGrid(Number)
-											return (Number // ToolGrid)*ToolGrid
+											return ((Number // ToolGrid)*ToolGrid)+ToolGrid/2
 										end
 
 										PosDiference = Vector3.new(
