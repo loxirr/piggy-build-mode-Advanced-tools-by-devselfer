@@ -3831,7 +3831,6 @@ do
 				Clone:AddTag("Input")
 				screenGuiJanitor:Add(Clone)
 
-				Clone.Parent = Model
 				Clone.Name = "Input" .. tostring(index)
 
 				for i, child in ipairs(Clone:GetDescendants()) do
@@ -3849,6 +3848,8 @@ do
 				Clone.Destroying:Connect(function()
 					JanitorObject:Destroy()
 				end)
+
+				Clone.Parent = Model
 
 			end
 
@@ -4584,7 +4585,7 @@ do
 								end
 								ActualInputTarget = TargetInput
 							end
-						else
+						elseif ActualInputTarget then
 							local _,NormPos,Norm = GetInputTarget(Inputs)
 							local Cf = ActualClicked:GetPivot()
 
@@ -5970,4 +5971,4 @@ do
 	end
 end
 
-print("Inyecting finished")
+print("Inyecting finished")	
