@@ -1,16 +1,27 @@
 --[[
 
 Script by devselfer
-Actual Version: 1.0.1
+Actual Version: 1.1.1
+
+Version 1.1.1 changes:
+	Added new configuration to set block rotation 
+	adding drag button to build menu
+	blocks size in material and color menu increased 1 stud
+	move tool improved
+	resize tool bugs fixed
+	borders improved and optimized
 
 Version 1.0.1 changes:
-toolgrid bug fixed
-movement tool bug fixed
-movement tool model updated
-added update logs
+	toolgrid bug fixed
+	movement tool bug fixed
+	movement tool model updated
+	added update logs
 
-Version 1.0.0 changes: published script with advanced scaling, advanced rotation
-advanced movement, etc
+Version 1.0.0 changes: 
+	published script 
+	All tools created
+	UI created
+	etc
 
 ]]
 
@@ -36,6 +47,14 @@ local function WaitFunc(WaitEveryFrames:number)
 	if BuildId % (WaitEveryFrames or 5) == 0 then
 		task.wait()
 	end
+end
+
+--Funcion para obtener la posicion exacta del puntero en la pantalla tanto celular como pc
+local function GetMousePosition(): Vector2
+	local Guiinset = GuiService:GetGuiInset()
+	local mousePos = UserInputService:GetMouseLocation()
+
+	return Vector2.new(mousePos.X - Guiinset.X, mousePos.Y - Guiinset.Y)
 end
 
 --modules
@@ -215,9 +234,9 @@ local GuiConfigurations = {
 --Screengui
 local ScreenGui = nil ::ScreenGui
 do		
-	ScreenGui = PlayerGui:WaitForChild("ScreenGui",3)
+	ScreenGui = PlayerGui:WaitForChild("ScreenGui",5)
 	if ScreenGui then
-
+		print("epic testing print")
 	else
 		local function PutScreenGui(instances)
 			ScreenGui = instances["ScreenGui"]
@@ -3362,6 +3381,7 @@ local Events = {
 	MaterialChanged = AddToClean(Instance.new("BindableEvent",ScreenGui)),
 	BrickColorChanged = AddToClean(Instance.new("BindableEvent",ScreenGui)),
 	WorldStateChanged = AddToClean(Instance.new("BindableEvent",ScreenGui)),
+	RotationOffsetChanged = AddToClean(Instance.new("BindableEvent",ScreenGui)),
 }
 
 local function ApuntaCamaraToItem(viewportFrame, camera:Camera, item)
@@ -3592,21 +3612,6 @@ do
 		AddToClean(ThisPlayer.CharacterAdded:Connect(AddPlayerToTable))
 	end))
 
-	local function AddHighlightToModel(Model,FillColor,OutlineColor,FillTransparency,OutlineTransparency)
-		if not Model then return end
-		local Highlight = Model:FindFirstChild("ThisHighlight") or Instance.new("Highlight")
-		Highlight.Name = "ThisHighlight"
-		Highlight.Parent = Model
-		Highlight.FillColor = FillColor
-		Highlight.OutlineColor = OutlineColor
-		Highlight.FillTransparency = FillTransparency
-		Highlight.OutlineTransparency = OutlineTransparency
-		Highlight.Enabled = true
-		Highlight.Adornee = Model
-		AddToClean(Highlight)
-		return Highlight
-	end
-
 	local function RemoveBorders(Model)
 		if not Model then return end
 
@@ -3624,66 +3629,18 @@ do
 
 	local function CreateBorders(Model:Model, Color)
 		if not Model or not Model.Parent then return end
-
-		local cf, size = Model:GetBoundingBox()
-
-		local t = 0.05 -- grosor
-
-		local sx, sy, sz = size.X/2, size.Y/2, size.Z/2
-
-		local BordersConfig = {
-
-			-- 🔹 Ejes X
-			{Size = Vector3.new(size.X, t, t), Offset = Vector3.new(0, -sy, -sz)},
-			{Size = Vector3.new(size.X, t, t), Offset = Vector3.new(0, -sy, sz)},
-			{Size = Vector3.new(size.X, t, t), Offset = Vector3.new(0, sy, -sz)},
-			{Size = Vector3.new(size.X, t, t), Offset = Vector3.new(0, sy, sz)},
-
-			-- 🔹 Ejes Y
-			{Size = Vector3.new(t, size.Y, t), Offset = Vector3.new(-sx, 0, -sz)},
-			{Size = Vector3.new(t, size.Y, t), Offset = Vector3.new(-sx, 0, sz)},
-			{Size = Vector3.new(t, size.Y, t), Offset = Vector3.new(sx, 0, -sz)},
-			{Size = Vector3.new(t, size.Y, t), Offset = Vector3.new(sx, 0, sz)},
-
-			-- 🔹 Ejes Z
-			{Size = Vector3.new(t, t, size.Z), Offset = Vector3.new(-sx, -sy, 0)},
-			{Size = Vector3.new(t, t, size.Z), Offset = Vector3.new(-sx, sy, 0)},
-			{Size = Vector3.new(t, t, size.Z), Offset = Vector3.new(sx, -sy, 0)},
-			{Size = Vector3.new(t, t, size.Z), Offset = Vector3.new(sx, sy, 0)},
-		}
-
-		for index = 1, 12 do
-			local config = BordersConfig[index]
-			local Part = Model:FindFirstChild("Border" .. tostring(index))
-			if not Part then
-				Part = Instance.new("Part")
-				Part.Name = "Border" .. tostring(index)
-				Part.Anchored = true
-				Part.CanCollide = false
-				Part.CanQuery = false
-				Part.CanTouch = false
-				Part.Transparency = 0
-				Part.Size = config.Size
-
-				-- 🔥 CLAVE: aplicar rotación del modelo
-				Part.CFrame = cf * CFrame.new(config.Offset)
-
-				Part.Parent = Model
-				Part:AddTag("Input")
-
-				screenGuiJanitor:Add(Part)
-			end
-
-			AddHighlightToModel(
-				Part,
-				Color,
-				Color,
-				0,
-				0
-			)
+		
+		local Border = Model:FindFirstChildOfClass("SelectionBox")
+		if not Border then
+			Border = Instance.new("SelectionBox")
+			Border.Parent = Model
+			Border.Adornee = Model
+			Border.LineThickness = 0.05
+			Border.Transparency = 0
+			Border:AddTag("Input")
 		end
-
-		table.clear(BordersConfig)
+		Border.Color3 = Color
+		AddToClean(Border)
 	end
 
 	local function GetTarget()
@@ -3757,213 +3714,6 @@ do
 		return NewTarget
 	end
 
-	local function CreateInputs(Model:Model, Color,ModelToClone:Model,CenterPoint:boolean,Local:boolean)
-		if not Model or not Model.Parent then return end
-		if not ModelToClone then return end
-
-		if CenterPoint == nil then
-			CenterPoint = false
-		end
-
-		local _	,SizeClone = ModelToClone:GetBoundingBox()
-
-		local cf, size = Model:GetBoundingBox()
-		if not Local then
-			cf = CFrame.new(cf.Position)
-		end
-
-		local MaxSize = math.max(SizeClone.X,SizeClone.Y,SizeClone.Z)
-		local Offsets = Vector3.new(
-			size.X/2,size.Y/2,size.Z/2
-		) + Vector3.new(MaxSize,MaxSize,MaxSize)
-
-		local BordersConfig = {
-
-			-- offset X
-			{NewCFrame = (cf*CFrame.Angles(0,0,math.rad(90))) * CFrame.new(0,Offsets.X,0)},
-			{NewCFrame = (cf*CFrame.Angles(0,0,-math.rad(90))) * CFrame.new(0,Offsets.X,0)},
-
-			-- offset Y
-			{NewCFrame = (cf*CFrame.Angles(0,0,0)) * CFrame.new(0,Offsets.Y,0)},
-			{NewCFrame = (cf*CFrame.Angles(math.rad(-180),0,0)) * CFrame.new(0,Offsets.Y,0)},
-
-			-- offset Z
-			{NewCFrame = (cf*CFrame.Angles(math.rad(90),0,0)) * CFrame.new(0,Offsets.Z,0)},
-			{NewCFrame = (cf*CFrame.Angles(-math.rad(90),0,0)) * CFrame.new(0,Offsets.Z,0)},
-
-			{NewCFrame = cf}
-		}
-
-		local Clones = {}
-		for index = 1, 6 + ((CenterPoint and 1) or 0) do
-			local config = BordersConfig[index]
-
-			local Clone = Model:FindFirstChild("Input" .. tostring(index))
-			if not Clone then
-
-				if index == 7 then
-					Clone = Instance.new("Model")
-					local Part = Instance.new("Part")
-					Part.Parent = Clone
-					Part.Size = Vector3.new(0.4,0.4,0.4)
-					Part.Transparency = 0
-					Part.CanCollide = false
-					Part.Anchored = true
-				else
-					Clone = ModelToClone:Clone()
-				end
-				local InitialCFrame = config.NewCFrame
-
-				local function CalculateDistance()
-					local ClonePosition = Clone:GetPivot().Position
-					local CameraPosition = CurrentCamera.CFrame.Position
-					local Distance = (ClonePosition - CameraPosition).Magnitude
-					Clone:ScaleTo(Distance/15)
-					if index == 7 then
-						Clone:PivotTo(InitialCFrame)
-					else
-						Clone:PivotTo(InitialCFrame * CFrame.new(0,Distance/15,0))
-					end
-				end
-
-				CalculateDistance()
-
-				Clone:AddTag("Input")
-				screenGuiJanitor:Add(Clone)
-
-				Clone.Name = "Input" .. tostring(index)
-
-				for i, child in ipairs(Clone:GetDescendants()) do
-					if child:IsA("BasePart") and not child:HasTag("Input") then
-						child:AddTag("Input")
-					end
-				end
-
-				local JanitorObject = Janitor.new()
-
-				JanitorObject:Add(RunService.Heartbeat:Connect(function(Property)
-					CalculateDistance()
-				end))
-
-				Clone.Destroying:Connect(function()
-					JanitorObject:Destroy()
-				end)
-
-				Clone.Parent = Model
-
-			end
-
-			table.insert(Clones,Clone)
-
-			for i, Part in ipairs(Clone:GetDescendants()) do
-				if Part:IsA("BasePart") then
-					AddHighlightToModel(
-						Part,
-						Color,
-						Color,
-						0,
-						0
-					)
-				end
-			end
-		end
-
-		table.clear(BordersConfig)
-
-		return Clones
-	end
-
-	local function GetInputTarget(Inputs)
-		if not Inputs then warn("nil") return end
-
-		local RayCastParams = RaycastParams.new()
-		RayCastParams.FilterType = Enum.RaycastFilterType.Include
-		local temp = {}
-		for i, Model in ipairs(Inputs) do
-			table.insert(temp,Model)
-		end
-		RayCastParams.FilterDescendantsInstances = temp
-
-		local MouseRay = CurrentCamera:ScreenPointToRay(Mouse.X, Mouse.Y)
-
-		local RayCast = workspace:Raycast(MouseRay.Origin, MouseRay.Direction * 1000, RayCastParams)
-		if not RayCast then return end
-
-		local instance = RayCast.Instance
-		if not instance then return warn("NoInstance") end
-
-		local FinalModel = instance:FindFirstAncestorOfClass("Model")
-		if not FinalModel then return warn("NoModel") end
-
-		local Cf = FinalModel:GetPivot()
-		local StartPosition = Cf.Position
-
-		local Name = string.gsub(FinalModel.Name,"Input","")
-		local Vector
-
-		if Name == "1" then
-			Vector = Vector3.new(1,0,0)
-			StartPosition = Vector3.new(
-				RayCast.Position.X,
-				StartPosition.Y,
-				StartPosition.Z
-			)
-
-		elseif Name == "2" then
-			Vector = Vector3.new(-1,0,0)
-			StartPosition = Vector3.new(
-				RayCast.Position.X,
-				StartPosition.Y,
-				StartPosition.Z
-			)
-
-		elseif Name == "3" then
-			Vector = Vector3.new(0,-1,0)
-			StartPosition = Vector3.new(
-				StartPosition.X,
-				RayCast.Position.Y,
-				StartPosition.Z
-			)
-		elseif Name == "4" then
-			Vector = Vector3.new(0,1,0)
-			StartPosition = Vector3.new(
-				StartPosition.X,
-				RayCast.Position.Y,
-				StartPosition.Z
-			)
-
-		elseif Name == "5" then
-			Vector = Vector3.new(0,0,-1)
-			StartPosition = Vector3.new(
-				StartPosition.X,
-				StartPosition.Y,
-				RayCast.Position.Z
-			)
-
-		elseif Name == "6" then
-			Vector = Vector3.new(0,0,1)
-			StartPosition = Vector3.new(
-				StartPosition.X,
-				StartPosition.Y,
-				RayCast.Position.Z
-			)
-
-
-		elseif Name == "7" then
-			Vector = Vector3.new(1,1,1)
-			StartPosition = Vector3.new(
-				StartPosition.X,
-				StartPosition.Y,
-				StartPosition.Z
-			)
-
-		end
-
-		if not Vector then return warn("NoVector") end
-
-		return FinalModel,StartPosition, Vector
-	end
-
 	--add
 	do
 
@@ -4034,34 +3784,59 @@ do
 
 		AddToClean(UserInputService.InputBegan:Connect(function(Input)
 			if ActualState ~= "add" then return end
+			
 			if Input.KeyCode == Enum.KeyCode.R then
+				
+				local ToAdd = ActualRotationGrid
+				if RotationOffset.Y + ToAdd > 360 then
+					ToAdd -= RotationOffset.Y
+				end
+				
+				
 				RotationOffset = Vector3.new(
 					RotationOffset.X,
-					RotationOffset.Y + 45,
+					RotationOffset.Y + ToAdd,
 					RotationOffset.Z
 				)
+				Events.RotationOffsetChanged:Fire()
 			end
 		end))
 
 		AddToClean(UserInputService.InputBegan:Connect(function(Input)
 			if ActualState ~= "add" then return end
+			
 			if Input.KeyCode == Enum.KeyCode.T then
+
+				local ToAdd = ActualRotationGrid
+				if RotationOffset.X + ToAdd > 360 then
+					ToAdd -= RotationOffset.X
+				end
+				
 				RotationOffset = Vector3.new(
-					RotationOffset.X + 45,
+					RotationOffset.X + ToAdd,
 					RotationOffset.Y,
 					RotationOffset.Z
 				)
+				Events.RotationOffsetChanged:Fire()
 			end
 		end))
 
 		AddToClean(UserInputService.InputBegan:Connect(function(Input)
 			if ActualState ~= "add" then return end
+
 			if Input.KeyCode == Enum.KeyCode.Y then
+
+			local ToAdd = ActualRotationGrid
+				if RotationOffset.Z + ToAdd > 360 then
+					ToAdd -= RotationOffset.Z
+				end
+			
 				RotationOffset = Vector3.new(
 					RotationOffset.X,
 					RotationOffset.Y,
-					RotationOffset.Z + 45
+					RotationOffset.Z + ToAdd
 				)
+				Events.RotationOffsetChanged:Fire()
 			end
 		end))
 
@@ -4132,9 +3907,9 @@ do
 						local ZIsMax = absZ > absX and absZ > absY
 
 						PositionResult = Vector3.new(
-							XIsMax and PositionResult.X or ((PositionResult.X // ToolGrid)*ToolGrid)+ToolGrid/2,
-							YIsMax and PositionResult.Y or ((PositionResult.Y // ToolGrid)*ToolGrid)+ToolGrid/2,
-							ZIsMax and PositionResult.Z or ((PositionResult.Z // ToolGrid)*ToolGrid)+ToolGrid/2
+							XIsMax and PositionResult.X or ((PositionResult.X // ToolGrid)*ToolGrid)+2.25,
+							YIsMax and PositionResult.Y or ((PositionResult.Y // ToolGrid)*ToolGrid)+2.25,
+							ZIsMax and PositionResult.Z or ((PositionResult.Z // ToolGrid)*ToolGrid)+2.25
 						)
 					end
 
@@ -4150,26 +3925,26 @@ do
 
 			if ActualState == "add" then
 				if not ActualClonedModel then return end
+				
+				local finalPosition = ActualClonedModel:GetPivot()
+				local SpaceOccuped = false
+
+				local params = OverlapParams.new()
+				params.FilterType = Enum.RaycastFilterType.Exclude
+				params.FilterDescendantsInstances = {ActualClonedModel,PlayersModels}
+
+				local parts = workspace:GetPartBoundsInBox(
+					finalPosition,ActualClonedModelSize*0.99,params
+				)
+				SpaceOccuped = #parts > 0
+				
 				ModelsCreated += 1
+				
 				local tempcloned = ActualClonedModel:Clone()
 				tempcloned.Parent = BuildModel
 				RemoveBorders(tempcloned)
-				local finalPosition = tempcloned:GetPivot()
-				local SpaceOccuped = false
 
-
-				if IgnorePiggyHitboxs then
-					local params = OverlapParams.new()
-					params.FilterType = Enum.RaycastFilterType.Exclude
-					params.FilterDescendantsInstances = {tempcloned,ActualCreationModel}
-
-					local parts = workspace:GetPartBoundsInBox(
-						finalPosition,ActualClonedModelSize,params
-					)
-					SpaceOccuped = #parts > 0
-				end
-
-				if SpaceOccuped then
+				if SpaceOccuped and IgnorePiggyHitboxs then
 					local block
 					task.spawn(function()
 						block = BuildFunctions.Build(ActualCreationModel,CFrame.new(1000000+(ModelsCreated*50),1000000+(ModelsCreated*50),1000000+(ModelsCreated*50)),ActualBrickColor,ActualMaterial)
@@ -4177,7 +3952,7 @@ do
 					local Time = 0
 					while block == nil do
 						Time += task.wait()
-						if Time > 0.5 then
+						if Time > 0.1 then
 							warn("Block no loaded")
 							break
 						end
@@ -4185,7 +3960,7 @@ do
 					if block then
 						BuildFunctions.Move(block,finalPosition)
 					end
-				else
+				elseif not SpaceOccuped then
 					local block
 					task.spawn(function()
 						block = BuildFunctions.Build(ActualCreationModel,finalPosition,ActualBrickColor,ActualMaterial)
@@ -4193,11 +3968,13 @@ do
 					local Time = 0
 					while block == nil do
 						Time += task.wait()
-						if Time > 0.5 then
+						if Time > 0.1 then
 							warn("Block no loaded")
 							break
 						end
 					end
+				else
+					warn("Space occupied")
 				end
 
 				tempcloned:Destroy()
@@ -4323,172 +4100,6 @@ do
 
 	--Herramientas avanzadas
 	do
-		local function GetCFrameDiference(InitialPosition:CFrame,Axis:Vector3,Model:Model,IsLocal:boolean)
-			if not InitialPosition then warn("nil") return end
-			if not Axis then warn("nil") return end
-
-			Axis = Axis.Unit
-
-			--Obtener folder de planos
-			local function GetPlanesFolder()
-				local Planes = workspace:FindFirstChild("PlanesContainer")
-				if not Planes then
-					Planes = Instance.new("Folder")
-					Planes.Name = "PlanesContainer"
-					Planes.Parent = workspace
-					screenGuiJanitor:Add(Planes)
-				end
-
-				return Planes
-			end
-
-			local IsX = Axis.X ~= 0
-			local IsY = Axis.Y ~= 0
-			local IsZ = Axis.Z ~= 0
-
-			if 
-				not IsX and
-				not IsY and
-				not IsZ
-			then
-				warn("Axis is zero or invalid")
-				return nil, nil
-			end
-
-			--Obtener plano
-			local function GetPlane(ThisInitialPosition,ThisAxis)
-				local Planes = GetPlanesFolder()
-
-				-- Crear un plano (Parte invisible) perpendicular al eje
-				local plane = Instance.new("Part")
-				plane.Name = "MovementPlane"
-				plane.Anchored = true
-				plane.CanCollide = false
-				plane.Transparency = 1
-				plane.Material = Enum.Material.SmoothPlastic
-				plane.Parent = Planes
-
-				-- Poner Size y posicionar
-				local min = 0.01
-				local largeSize = 10000
-				if IsX or IsZ then
-					plane.Size = Vector3.new(largeSize, min, largeSize)
-				elseif IsY then
-					plane.Size = Vector3.new(min, largeSize, largeSize)
-				end
-				if IsLocal then
-					plane.CFrame = ThisInitialPosition
-				else
-					plane.CFrame = CFrame.new(ThisInitialPosition.Position)
-				end
-
-				return plane, Planes
-			end
-
-			local Params = RaycastParams.new()
-			local Planes
-			if IsX and IsY and IsZ then
-				Planes = GetPlanesFolder()
-
-				local temp = {}
-
-				for i = #Excluded,1,-1 do
-					local child = Excluded[i]
-					if not child or not child.Parent then 
-						table.remove(Excluded,i)
-						continue
-					end
-					table.insert(temp,child)
-				end
-
-				for i = #PlayersModels,1,-1 do
-					local child = PlayersModels[i]
-					if not child or not child.Parent then 
-						table.remove(PlayersModels,i)
-						continue
-					end
-					table.insert(temp,child)
-				end
-
-				if IgnoreInvisibleBlocks then
-					for i = #TransparentBlocks,1,-1 do
-						local child = TransparentBlocks[i]
-						if not child or not child.Parent then 
-							table.remove(TransparentBlocks,i)
-							continue
-						end
-						table.insert(temp,child)
-					end
-				else
-					table.clear(TransparentBlocks)
-				end
-
-				table.insert(temp,Model)
-
-				Params.FilterDescendantsInstances = temp
-			else
-				local Plane
-				Plane,Planes = GetPlane(InitialPosition,Axis)
-
-				Params.FilterType = Enum.RaycastFilterType.Include
-				Params.FilterDescendantsInstances = {Planes}
-			end
-
-			local Connection = {}
-
-			function Connection.Disconnect()
-				Planes:ClearAllChildren()
-				table.clear(Connection)
-			end
-
-			function Connection.GetDiference() :CFrame
-
-				local MouseToRay = CurrentCamera:ScreenPointToRay(Mouse.X,Mouse.Y)
-
-				local Raycast = workspace:Raycast(MouseToRay.Origin,MouseToRay.Direction*1000,Params)
-				if not Raycast then return end
-
-				local RayCastPosition = Raycast.Position
-				if IsLocal then
-					RayCastPosition = InitialPosition:PointToObjectSpace(Raycast.Position)
-				end
-				local Position = InitialPosition.Position
-				if IsLocal then
-					Position = InitialPosition:PointToObjectSpace(InitialPosition.Position)
-				end
-				local Part = Raycast.Instance
-
-				if IgnoreInvisibleBlocks and Part.Transparency == 1 then
-					AddObjectToExclude(Part,TransparentBlocks)
-				end
-
-				local DiferenceX = 0
-				local DiferenceY = 0
-				local DiferenceZ = 0
-				if IsX then
-					DiferenceX = RayCastPosition.X-Position.X
-				end
-				if IsY then
-					DiferenceY = RayCastPosition.Y-Position.Y
-				end
-				if IsZ then
-					DiferenceZ = RayCastPosition.Z-Position.Z
-				end
-
-				return Vector3.new(DiferenceX,DiferenceY,DiferenceZ)
-			end
-
-			return Connection
-
-		end
-
-		local MousePressingState = false
-		Mouse.Button1Down:Connect(function()
-			MousePressingState = true
-		end)
-		Mouse.Button1Up:Connect(function()
-			MousePressingState = false
-		end)
 
 		local CtlrPressingState = false
 		UserInputService.InputBegan:Connect(function(input)
@@ -4514,132 +4125,140 @@ do
 			end
 		end)
 
-		--Mover
+		--mover
 		do
 			local ActualTarget
 			local ActualClicked
 
-			local Inputs
-
-			local Normal
-			local StartCFrame
-			local StartCframeInput
-			local CframeCalculator
-			local ActualInputTarget
-			local ActualFinalCframe
+			local Handles
+			local Adornee
 
 			local ActualColors = {
-				Selected = Color3.new(0, 0.101961, 1),
-				NoSelected = Color3.new(0, 0, 0.631373),
+				Selected = Color3.new(0, 0.784314, 1),
+				NoSelected = Color3.new(0, 0.419608, 0.52549),
 			}
+
+			local function CreateHandles(Act)
+
+				if Handles then
+					Handles:Destroy()
+					Handles = nil
+				end
+				if Adornee then
+					Adornee:Destroy()
+					Adornee = nil
+				end
+
+				if not Act then
+					return
+				end
+
+				local InitialPosition = CFrame.new(Act:GetPivot().Position)
+				local ModelRotation = Act:GetPivot().Rotation
+				local LastDistance = 0
+
+				Adornee = Instance.new("Part")
+				Adornee.Parent = workspace
+				Adornee.Anchored = true
+				Adornee.CanCollide = false
+				Adornee.Transparency = 1
+				Adornee.Size = Act:GetExtentsSize()
+				if MoveToolIsLocal then
+					Adornee.CFrame = InitialPosition*ModelRotation
+				else
+					Adornee.CFrame = InitialPosition
+				end
+
+				Handles = Instance.new("Handles")
+				Handles.Parent = PlayerGui
+				Handles.Adornee = Adornee
+				Handles.Color3 = ActualColors.Selected
+				Handles.Style = Enum.HandlesStyle.Movement
+
+				AddToClean(Handles.MouseButton1Up:Connect(function()
+					InitialPosition = CFrame.new(Act:GetPivot().Position)
+					LastDistance = 0
+					if MoveToolIsLocal then
+						BuildFunctions.Move(Act,Adornee.CFrame)
+					else
+						BuildFunctions.Move(Act,CFrame.new(Adornee.Position)*ModelRotation)
+					end
+				end))
+
+				local conn = AddToClean(Events.WorldStateChanged.Event:Connect(function()
+					if MoveToolIsLocal then
+						Adornee.CFrame *= ModelRotation
+					else
+						Adornee.CFrame = CFrame.new(Adornee.CFrame.Position)
+					end
+				end))
+				
+				Handles.Destroying:Once(function()
+					conn:Disconnect()
+				end)
+
+				AddToClean(Handles.MouseDrag:Connect(function(Face, distance)
+					local delta = distance - LastDistance
+
+					local OffsetX = 0
+					local OffsetY = 0
+					local OffsetZ = 0
+
+					if Face == Enum.NormalId.Right then
+						OffsetX = distance
+					elseif Face == Enum.NormalId.Left then
+						OffsetX = -distance
+					elseif Face == Enum.NormalId.Top then
+						OffsetY = distance
+					elseif Face == Enum.NormalId.Bottom then
+						OffsetY = -distance
+					elseif Face == Enum.NormalId.Back then
+						OffsetZ = distance
+					elseif Face == Enum.NormalId.Front then
+						OffsetZ = -distance
+					end
+
+					local CframeOffset
+					
+					if ActualToolGridState and ToolGrid > 0 then
+						local ResultX = 0
+						local ResultY = 0
+						local ResultZ = 0
+
+						if Face == Enum.NormalId.Right or Face == Enum.NormalId.Left then
+							ResultX = (OffsetX + InitialPosition.X+2.25)%ToolGrid
+						elseif Face == Enum.NormalId.Top or Face == Enum.NormalId.Bottom then
+							ResultY = (OffsetY + InitialPosition.Y+2.25)%ToolGrid
+						elseif Face == Enum.NormalId.Back or Face == Enum.NormalId.Front then
+							ResultZ = (OffsetZ + InitialPosition.Z+2.25)%ToolGrid
+						end
+						
+						CframeOffset = CFrame.new(OffsetX- ResultX,OffsetY- ResultY,OffsetZ- ResultZ)
+					else
+						CframeOffset = CFrame.new(OffsetX,OffsetY,OffsetZ)
+					end
+					
+					if MoveToolIsLocal then
+						local NewCframe = InitialPosition*ModelRotation*CframeOffset
+						Act:PivotTo(NewCframe)
+						Adornee.CFrame = NewCframe
+					else
+						local NewCframe = InitialPosition*CframeOffset
+						Act:PivotTo(NewCframe*ModelRotation)
+						Adornee.CFrame = NewCframe
+					end
+
+					LastDistance = distance
+					RemoveBorders(Act)
+					CreateBorders(Act,ActualColors.NoSelected)
+				end))
+
+				AddToClean(Adornee)
+				AddToClean(Handles)
+			end
 
 			AddToClean(RunService.PreSimulation:Connect(function()
 				if ActualState == "position" then
-
-					if ActualClicked and Inputs then
-
-						--Inputs
-						if not MousePressingState then
-							local TargetInput,_,_ = GetInputTarget(Inputs)
-
-							if StartCFrame then
-								StartCFrame = nil
-							end
-							if Normal then
-								Normal = nil
-							end
-							if StartCframeInput then
-								StartCframeInput = nil
-							end
-							if CframeCalculator then
-								CframeCalculator.Disconnect()
-								CframeCalculator = nil
-							end
-							if ActualFinalCframe then
-								BuildFunctions.Move(ActualClicked,ActualFinalCframe)
-								ActualFinalCframe = nil
-							end
-
-							if ActualInputTarget ~= TargetInput then
-								if ActualInputTarget then
-									for i, child in ipairs(ActualInputTarget:GetDescendants()) do
-										AddHighlightToModel(
-											child,
-											ActualColors.NoSelected,
-											ActualColors.NoSelected,
-											0,
-											0
-										)
-									end
-								end
-								if TargetInput then
-									for i, child in ipairs(TargetInput:GetDescendants()) do
-										AddHighlightToModel(
-											child,
-											ActualColors.Selected,
-											ActualColors.Selected,
-											0,
-											0
-										)
-									end
-								end
-								ActualInputTarget = TargetInput
-							end
-						elseif ActualInputTarget then
-							local _,NormPos,Norm = GetInputTarget(Inputs)
-							local Cf = ActualClicked:GetPivot()
-
-							if NormPos and Norm and Cf then
-
-								if not StartCFrame then
-									StartCFrame = Cf
-								end
-								if not Normal then
-									Normal = Norm
-								end
-								if not StartCframeInput and StartCFrame then
-									StartCframeInput = CFrame.new(NormPos) * StartCFrame.Rotation
-								end
-
-								if not CframeCalculator then
-									CframeCalculator = GetCFrameDiference(StartCframeInput,Normal,ActualClicked,MoveToolIsLocal)
-								end
-							end
-
-							if StartCFrame and Normal and StartCframeInput and CframeCalculator then
-								local PosDiference = CframeCalculator.GetDiference()
-
-								if PosDiference then
-
-									if ActualToolGridState then
-
-										local function ApplyToolGrid(Number)
-											return (Number // ToolGrid)*ToolGrid
-										end
-
-										PosDiference = Vector3.new(
-											ApplyToolGrid(PosDiference.X),
-											ApplyToolGrid(PosDiference.Y),
-											ApplyToolGrid(PosDiference.Z)
-										)
-									end
-
-									if MoveToolIsLocal then
-										ActualFinalCframe = StartCFrame*CFrame.new(PosDiference)
-									else
-										ActualFinalCframe = StartCFrame.Position + PosDiference
-										ActualFinalCframe = CFrame.new(ActualFinalCframe) * StartCFrame.Rotation
-									end
-									ActualClicked:PivotTo(ActualFinalCframe)
-									RemoveBorders(ActualClicked)
-									CreateBorders(ActualClicked,ActualColors.Selected)
-									Inputs = CreateInputs(ActualClicked,ActualColors.NoSelected,FlechaExample,true,MoveToolIsLocal)
-
-								end
-							end
-						end
-
-					end
 
 					--NormalTarget
 
@@ -4679,12 +4298,11 @@ do
 			end))
 
 			AddToClean(Mouse.Button1Down:Connect(function()
-				if ActualState == "position" and not ActualInputTarget then
-					Inputs = nil
+				if ActualState == "position" then
 					RemoveBorders(ActualClicked)
 					ActualClicked = ActualTarget
 					CreateBorders(ActualClicked,ActualColors.Selected)
-					Inputs = CreateInputs(ActualClicked,ActualColors.NoSelected,FlechaExample,true,MoveToolIsLocal)
+					CreateHandles(ActualClicked)					
 				end
 			end))
 
@@ -4693,31 +4311,13 @@ do
 				RemoveBorders(ActualClicked)
 				ActualTarget = nil
 				ActualClicked = nil
-				ActualTarget = nil
-				ActualClicked = nil
-				Inputs = nil
-				Normal = nil
-				StartCFrame = nil
-				StartCframeInput = nil
-				if CframeCalculator then
-					CframeCalculator.Disconnect()
-					CframeCalculator = nil
+				if Handles then
+					Handles:Destroy()
+					Handles = nil
 				end
-				ActualInputTarget = nil
-				ActualFinalCframe = nil
-			end))
-
-			AddToClean(Events.WorldStateChanged.Event:Connect(function()
-				if ActualState == "position" and Inputs then
-					Inputs = nil
-					RemoveBorders(ActualClicked)
-					CreateBorders(ActualClicked,ActualColors.Selected)
-					Inputs = CreateInputs(ActualClicked,ActualColors.NoSelected,FlechaExample,true,MoveToolIsLocal)
-
-					if CframeCalculator then
-						CframeCalculator.Disconnect()
-						CframeCalculator = GetCFrameDiference(StartCframeInput,Normal,ActualClicked,MoveToolIsLocal)
-					end
+				if Adornee then
+					Adornee:Destroy()
+					Adornee = nil
 				end
 			end))
 		end
@@ -4787,11 +4387,11 @@ do
 
 				AddToClean(Handles.MouseDrag:Connect(function(Face, distance)
 					distance = math.min(distance,2000)
-
+					
 					if ActualToolGridState and ToolGrid > 0 then
-						distance = (distance // ToolGrid) * ToolGrid
+						distance = (distance//ToolGrid)*ToolGrid
 					end
-
+					
 					if CtlrPressingState then
 
 						if ShiftPressingState then
@@ -4818,6 +4418,11 @@ do
 								AxisInitialSize = InitialSize.Z
 								AxisNewSize = AxisInitialSize + distance
 							end
+							
+							if ActualToolGridState and ToolGrid > 0 then
+								AxisNewSize = ((AxisNewSize//ToolGrid)*ToolGrid)
+							end
+							
 							local NewScale = (AxisNewSize / AxisInitialSize)*InitialScale
 							if NewScale <= 0 then
 								NewScale = 0.001
@@ -4826,26 +4431,21 @@ do
 							Adornee.Size = Act:GetExtentsSize()
 						else
 							distance *= 2
+							
+							local OffsetX = 0
+							local OffsetY = 0
+							local OffsetZ = 0
 
 							if Face == Enum.NormalId.Right or Face == Enum.NormalId.Left then
-								Adornee.Size = Vector3.new(
-									InitialSize.X + distance,
-									InitialSize.Y,
-									InitialSize.Z
-								)
+								OffsetX = distance
 							elseif Face == Enum.NormalId.Top or Face == Enum.NormalId.Bottom then
-								Adornee.Size = Vector3.new(
-									InitialSize.X,
-									InitialSize.Y + distance,
-									InitialSize.Z
-								)
+								OffsetY = distance
 							elseif Face == Enum.NormalId.Back or Face == Enum.NormalId.Front then
-								Adornee.Size = Vector3.new(
-									InitialSize.X,
-									InitialSize.Y,
-									InitialSize.Z + distance
-								)
+								OffsetZ = distance
 							end
+														
+							Adornee.Size = InitialSize + Vector3.new(OffsetX,OffsetY,OffsetZ)
+							
 							ResizeModel(Act,InitialSize,Adornee.Size)
 						end
 					else
@@ -4922,69 +4522,41 @@ do
 							)
 							Act:PivotTo(Adornee.CFrame)
 						else
-
-							local NewSizeX = InitialSize.X
-							local NewSizeY = InitialSize.Y
-							local NewSizeZ = InitialSize.Z
+							
 							local NewPositionX = 0
 							local NewPositionY = 0
 							local NewPositionZ = 0
+							local OffsetX = 0
+							local OffsetY = 0
+							local OffsetZ = 0
 
 							if Face == Enum.NormalId.Right then
-								NewSizeX = InitialSize.X + distance
-								if NewSizeX > 0 then
-									NewPositionX += distance/2
-								else
-									NewPositionX += -InitialSize.X/2
-								end
+								OffsetX = math.max(distance,-InitialSize.X+0.001)
+								NewPositionX = (OffsetX/2)
 							elseif Face == Enum.NormalId.Left then
-								NewSizeX = InitialSize.X + distance
-								if NewSizeX > 0 then
-									NewPositionX -= distance/2
-								else
-									NewPositionX -= -InitialSize.X/2
-								end
+								OffsetX = math.max(distance,-InitialSize.X+0.001)
+								NewPositionX = -(OffsetX/2)
 							elseif Face == Enum.NormalId.Top then
-								NewSizeY = InitialSize.Y + distance
-								if NewSizeY > 0 then
-									NewPositionY += distance/2
-								else
-									NewPositionY += -InitialSize.Y/2
-								end
+								OffsetY = math.max(distance,-InitialSize.Y+0.001)
+								NewPositionY = (OffsetY/2)
 							elseif Face == Enum.NormalId.Bottom then
-								NewSizeY = InitialSize.Y + distance
-								if NewSizeY > 0 then
-									NewPositionY -= distance/2
-								else
-									NewPositionY -= -InitialSize.Y/2
-								end
+								OffsetY = math.max(distance,-InitialSize.Y+0.001)
+								NewPositionY = -(OffsetY/2)
 							elseif Face == Enum.NormalId.Back then
-								NewSizeZ = InitialSize.Z + distance
-								if NewSizeZ > 0 then
-									NewPositionZ += distance/2
-								else
-									NewPositionZ += -InitialSize.Z/2
-								end
+								OffsetZ = math.max(distance,-InitialSize.Z+0.001)
+								NewPositionZ = (OffsetZ/2)
 							elseif Face == Enum.NormalId.Front then
-								NewSizeZ = InitialSize.Z + distance
-								if NewSizeZ > 0 then
-									NewPositionZ -= distance/2
-								else
-									NewPositionZ -= -InitialSize.Z/2
-								end
+								OffsetZ = math.max(distance,-InitialSize.Z+0.001)
+								NewPositionZ = -(OffsetZ/2)
 							end
-							Adornee.Size = Vector3.new(
-								NewSizeX,
-								NewSizeY,
-								NewSizeZ
-							)
-							Adornee.CFrame = InitialPosition * CFrame.new(
-								NewPositionX,
-								NewPositionY,
-								NewPositionZ
-							)
-							Act:PivotTo(Adornee.CFrame)
-							ResizeModel(Act,InitialSize,Adornee.Size)
+
+							local newcf = InitialPosition * CFrame.new(NewPositionX,NewPositionY,NewPositionZ)
+							Adornee.CFrame = newcf
+							Act:PivotTo(newcf)
+							
+							local newsize = InitialSize + Vector3.new(OffsetX,OffsetY,OffsetZ)
+							Adornee.Size = newsize
+							ResizeModel(Act,InitialSize,newsize)
 						end
 					end
 
@@ -5208,6 +4780,31 @@ do
 	local ScriptRemover = ToolBar.ScriptRemover
 	AddToClean(ScriptRemover.Activated:Connect(function()
 		ScreenGui:Destroy()
+	end))
+	local ScriptDragger = ToolBar.ScriptDragger
+	local Dragging = false
+	local AnteriorMousePosition
+	AddToClean(ScriptDragger.MouseButton1Down:Connect(function()
+		AnteriorMousePosition = GetMousePosition()
+		Dragging = true
+	end))
+	AddToClean(UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			Dragging = false
+			AnteriorMousePosition = nil
+		end
+	end))
+	AddToClean(UserInputService.InputChanged:Connect(function(input)
+		if Dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local ActualMousePosition = GetMousePosition()
+			local Delta = ActualMousePosition - AnteriorMousePosition
+			AnteriorMousePosition = ActualMousePosition
+			for i, Frame in ipairs(ScreenGui:GetChildren()) do
+				if Frame:IsA("Frame") then
+					Frame.Position += UDim2.new(0,Delta.X,0,Delta.Y)
+				end
+			end
+		end
 	end))
 
 	local ScrollingFrame = ToolBar:FindFirstChildOfClass("ScrollingFrame")
@@ -5645,7 +5242,7 @@ do
 		Part.Parent = Model
 		Part.Material = material
 		Part.Color = ActualBrickColor.Color
-		Part.Size = Vector3.new(1,1,1)
+		Part.Size = Vector3.new(2,2,2)
 		Part.Anchored = true
 
 		ApuntaCamaraToItem(ViewPortFrame,Camera,Model)
@@ -5725,7 +5322,7 @@ do
 		Part.Parent = Model
 		Part.Material = ActualMaterial
 		Part.BrickColor = brickColor
-		Part.Size = Vector3.new(1,1,1)
+		Part.Size = Vector3.new(2,2,2)
 		Part.Anchored = true
 
 		ApuntaCamaraToItem(ViewPortFrame,Camera,Model)
@@ -5768,14 +5365,6 @@ do
 		end
 
 		return Page
-	end
-
-	--Funcion para obtener la posicion exacta del puntero en la pantalla tanto celular como pc
-	local function GetMousePosition(): Vector2
-		local Guiinset = GuiService:GetGuiInset()
-		local mousePos = UserInputService:GetMouseLocation()
-
-		return Vector2.new(mousePos.X - Guiinset.X, mousePos.Y - Guiinset.Y)
 	end
 
 	--Funcion para obtener en que porcentaje esta el mouse en una barra de progreso
@@ -5949,8 +5538,8 @@ do
 			TextBoxToolGrid.Text = ToolGridConn.Number
 		end)
 		TextBoxToolGrid.FocusLost:Connect(function()
-			ToolGridConn.Update(TextBoxToolGrid.Text)
-			ToolGrid = ToolGridConn.Number
+			ToolGrid = tonumber(TextBoxToolGrid.Text) or ToolGrid
+			RotationConn.Update(ActualRotationGrid)
 		end)	
 
 		--ActualRotation
@@ -5964,8 +5553,46 @@ do
 			TextBoxRotation.Text = RotationConn.DividedNumber
 		end)
 		TextBoxRotation.FocusLost:Connect(function()
-			RotationConn.Update(TextBoxRotation.Text)
-			ActualRotationGrid = RotationConn.Number
+			ActualRotationGrid = tonumber(TextBoxRotation.Text) or ActualRotationGrid
+			RotationConn.Update(ActualRotationGrid)
+		end)
+		
+		--RotationOFfset configurations
+		local ActualBlockRotation = Page.ActualBlockRotation
+		local XTextBox = ActualBlockRotation.X
+		local YTextBox = ActualBlockRotation.Y
+		local ZTextBox = ActualBlockRotation.Z
+		XTextBox.FocusLost:Connect(function()
+			local Number = tonumber(XTextBox.Text) or RotationOffset.X 
+			RotationOffset = Vector3.new(
+				Number,
+				RotationOffset.Y,
+				RotationOffset.Z
+			)
+			Events.RotationOffsetChanged:Fire()
+		end)
+		YTextBox.FocusLost:Connect(function()
+			local Number = tonumber(YTextBox.Text) or RotationOffset.Y 
+			RotationOffset = Vector3.new(
+				RotationOffset.X,
+				Number,
+				RotationOffset.Z
+			)
+			Events.RotationOffsetChanged:Fire()
+		end)
+		ZTextBox.FocusLost:Connect(function()
+			local Number = tonumber(ZTextBox.Text) or RotationOffset.Z 
+			RotationOffset = Vector3.new(
+				RotationOffset.X,
+				RotationOffset.Y,
+				Number
+			)
+			Events.RotationOffsetChanged:Fire()
+		end)
+		Events.RotationOffsetChanged.Event:Connect(function(NewOffset)
+			XTextBox.Text = RotationOffset.X
+			YTextBox.Text = RotationOffset.Y
+			ZTextBox.Text = RotationOffset.Z
 		end)
 
 	end
