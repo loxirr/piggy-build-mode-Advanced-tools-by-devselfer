@@ -4146,7 +4146,7 @@ do
 			table.clear(instances)
 		end
 
-		local WaitObjectSearcher = WaitFunc.new(100)
+		local WaitObjectSearcher = WaitFunc.new(250)
 
 		Searcher.Visible = false
 		screenGuiJanitor:Add(
@@ -4181,7 +4181,6 @@ do
 								ArrastrarJanitor:Destroy()
 								return
 							end
-							if TablaIterando then return end
 							if input.UserInputType == Enum.UserInputType.MouseMovement then
 								local End = UIFuncs.GetMousePosition(ScreenGui)
 
@@ -4189,6 +4188,8 @@ do
 									(End.X - Start.X),
 									-(End.Y - Start.Y)
 								)
+								
+								if TablaIterando then return end
 
 								TablaIterando = true
 
@@ -4216,7 +4217,7 @@ do
 									WaitObjectSearcher:Wait()
 								end		
 
-								OnSelectedTargetsChanged:Fire()
+								UpdateBorders()
 								TablaIterando = nil
 							end
 						end)
@@ -8015,13 +8016,20 @@ do
 		local Changes = {
 
 			{
+				"2.1.3",
+				{
+					"▫️Multi selector aspector updater fixed",
+					"▫️Removed things that weren't actually added in the update logs xd",
+				}
+				
+			},
+
+			{
 				"2.1.2",
 				{
 					"▫️Added multi select (Click and drag the mouse on the screen and everything inside the rectangle will be automatically selected.)",
-					"▫added properties menu",
-					"▫added duplicate",
 					"▫Improved target system",
-					"▫Added undo and redo",
+					"▫Added undo, in the next update redo",
 					"▫Added search bar in materials, colors and models",
 					"▫Configurations improved",
 					"▫Functionality added to change UI color and transparency",
@@ -8032,7 +8040,8 @@ do
 					"▫Added notification system",
 					"▫Added update logs to UI",
 					"▫Added Resizer button",
-					"▫Models menu improved"
+					"▫Models menu improved",
+					"▫and many more things that I'm too lazy to translate and write down lol",
 				}
 
 			},
