@@ -8010,7 +8010,7 @@ do
 
 		ConfigurationsFuncs.CreateTextSetting(
 			Page,
-			"Script by devselfer, version 2.1.2"
+			"Script by devselfer, version 2.1.3"
 		)
 
 		local Changes = {
