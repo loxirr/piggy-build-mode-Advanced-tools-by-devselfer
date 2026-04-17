@@ -4873,6 +4873,11 @@ do
 				end
 
 				if block then
+					module.ModificateModel(
+						block,
+						AnteriorCf or Cf,
+						Size
+					)
 					if Size then
 						BuildFunctions.Resize(block,AnteriorCf or Cf,Size)
 					end
@@ -4994,7 +4999,14 @@ do
 				)
 				PushUndoObject(UndoInformation)
 			end
-
+			
+			module.ModificateModel(
+				Model,
+				Cf,
+				Size,
+				Color,
+				Material
+			)
 			if Cf then
 				BuildFunctions.Move(Model,Cf)
 			end
