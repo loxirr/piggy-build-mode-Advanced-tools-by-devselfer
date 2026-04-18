@@ -150,11 +150,17 @@ local Janitor = (function()
 
 	function JanitorObj.Destroy(self:JanitorObj)
 		self:Cleanup()
+		self.Destroyed = true
+	end
+
+	function JanitorObj.IsDestroyed(self:JanitorObj)
+		return self.Destroyed
 	end
 
 	function Janitor.new()
 		return setmetatable({
-			Tasks = {}
+			Tasks = {},
+			Destroyed = false
 		}, {__index = JanitorObj}) :: JanitorObj
 	end
 
@@ -5052,8 +5058,8 @@ do
 			table.clear(instances)
 		end
 
-		local WaitObjectSearcher = WaitFunc.new(50)
-		local MaxDistance = 1000*4.5
+		local WaitObjectSearcher = WaitFunc.new(250)
+		local MaxDistance = 250*4.5
 
 		Searcher.Visible = false
 		screenGuiJanitor:Add(
@@ -5082,56 +5088,84 @@ do
 					)
 
 					local TablaIterando
+					local processedModels = {}
 					ArrastrarJanitor:Add(
-						UserInputService.InputChanged:Connect(function(input)
+						RunService.Heartbeat:Connect(function()
 							if not MultiSelectEnabled then
 								ArrastrarJanitor:Destroy()
 								return
 							end
-							if input.UserInputType == Enum.UserInputType.MouseMovement then
-								local End = UIFuncs.GetMousePosition(ScreenGui)
+							local End = UIFuncs.GetMousePosition(ScreenGui)
 
-								Searcher.Size = UDim2.fromOffset(
-									(End.X - Start.X),
-									-(End.Y - Start.Y)
-								)
+							Searcher.Size = UDim2.fromOffset(
+								(End.X - Start.X),
+								-(End.Y - Start.Y)
+							)
 
-								if TablaIterando then return end
+							if TablaIterando then return end
+							TablaIterando = true
 
-								TablaIterando = true
+							table.clear(processedModels)
 
-								local minX, minY = Start.X, Start.Y
-								local maxX, maxY = End.X, End.Y
+							local minX = math.min(Start.X, End.X)
+							local maxX = math.max(Start.X, End.X)
+							local minY = math.min(Start.Y, End.Y)
+							local maxY = math.max(Start.Y, End.Y)
 
-								local x1 = math.min(minX, maxX)
-								local x2 = math.max(minX, maxX)
-								local y1 = math.min(minY, maxY)
-								local y2 = math.max(minY, maxY)
+							local CameraCf = CurrentCamera.CFrame
 
-								for i, child in ipairs(BuildModel:GetChildren()) do
-									WaitObjectSearcher:Wait()
-									
-									if child:IsA("Model") then
-										if #child:GetChildren() <= 0 then continue end
-										if (child:GetPivot().Position - CurrentCamera.CFrame.Position).Magnitude > MaxDistance then continue end
+							-- Datos de cámara
+							local fov = math.rad(CurrentCamera.FieldOfView)
+							local aspectRatio = math.abs(Searcher.Size.X.Offset) / math.abs(Searcher.Size.Y.Offset)
 
-										local screenPos, onScreen = CurrentCamera:WorldToViewportPoint(child:GetPivot().Position)
+							-- Altura y ancho visibles a esa distancia
+							local X = 2 * MaxDistance * math.tan(fov / 2)
+							local Y = X * aspectRatio
 
-										if not onScreen then continue end
-										if 
-											screenPos.X >= x1 and screenPos.X <= x2
-											and screenPos.Y >= y1 and screenPos.Y <= y2 
-										then
-											AddSelectedBlock(child,nil,true)
-										end
+							local BoxSize = Vector3.new(
+								X,
+								Y,
+								MaxDistance
+							)
 
-									end
-								end		
+							local parts = workspace:GetPartBoundsInBox(
+								CameraCf*CFrame.new(0, 0, -MaxDistance/2),
+								BoxSize
+							)
 
-								UpdateBorders()
-								OnSelectedTargetsChanged:Fire()
-								TablaIterando = nil
+							for _, child in ipairs(parts) do
+								if not MultiSelectEnabled or ArrastrarJanitor:IsDestroyed() then
+									ArrastrarJanitor:Destroy()
+									break
+								end
+
+								local model = child:FindFirstAncestorOfClass("Model")
+								if 
+									not model or 
+									processedModels[model] or 
+									not next(model:GetChildren()) or
+									not model:IsDescendantOf(BuildModel) 
+								then 
+									continue 
+								end
+
+								WaitObjectSearcher:Wait()
+								local screenPos, onScreen = CurrentCamera:WorldToViewportPoint(model:GetPivot().Position)
+
+								if not onScreen then continue end
+
+								if screenPos.X < minX or screenPos.X > maxX
+									or screenPos.Y < minY or screenPos.Y > maxY then
+									continue
+								end
+
+								processedModels[model] = true
+								AddSelectedBlock(model, nil, true)
 							end
+
+							UpdateBorders()
+							OnSelectedTargetsChanged:Fire()
+							TablaIterando = false
 						end)
 					)
 				end
@@ -8906,10 +8940,23 @@ do
 
 		ConfigurationsFuncs.CreateTextSetting(
 			Page,
-			"Script by devselfer, version 2.1.4"
+			"If you want to contact me with any ideas or questions, you can contact me on Discord with the DM loxirr1"
+		)
+
+		ConfigurationsFuncs.CreateTextSetting(
+			Page,
+			"Script by devselfer, version 2.1.5"
 		)
 
 		local Changes = {
+
+			{
+				"2.1.5",
+				{
+					"▫️Multi select optimized",
+				}
+
+			},
 
 			{
 				"2.1.4",
@@ -9019,3 +9066,4 @@ do
 end
 
 Notification.Notify("Script inyected!",10,Color3.new(0, 1, 0.0313725))
+print("inyected finished")
