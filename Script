@@ -5290,11 +5290,11 @@ do
 		local LastRaycasting = Raycast or LastRaycastingCicloPasado 
 
 		if ActualTargeting ~= ActualTargetingCicloPasado then
-			if ActualTargetingCicloPasado and not table.find(SelectedTargets,ActualTargetingCicloPasado) then
+			if ActualTargetingCicloPasado and  (not ActualSelectedTargetingColor or not table.find(SelectedTargets,ActualTargetingCicloPasado)) then
 				RemoveBorders(ActualTargetingCicloPasado)
 			end
 			if ActualTargetingBorderColor then
-				if ActualTargeting and not table.find(SelectedTargets,ActualTargeting) then
+				if ActualTargeting and (not ActualSelectedTargetingColor or not table.find(SelectedTargets,ActualTargeting)) then
 					CreateBorders(ActualTargeting,ActualTargetingBorderColor)
 				end
 			else
@@ -5506,10 +5506,10 @@ do
 		local AnteriorIsSelected = table.find(SelectedTargets,AnteriorTarget) and ActualSelectedTargetingColor and true or false
 		local ActualIsSelected = table.find(SelectedTargets,ActualTargeting) and ActualSelectedTargetingColor and true or false
 
-		if AnteriorTarget and not AnteriorIsSelected then
+		if AnteriorTarget and (not AnteriorIsSelected or not ActualSelectedTargetingColor) then
 			RemoveBorders(AnteriorTarget)
 		end
-		if ActualTargeting and ActualTargetingBorderColor and not ActualIsSelected then
+		if ActualTargeting and ActualTargetingBorderColor and (not ActualIsSelected or not ActualSelectedTargetingColor) then
 			CreateBorders(ActualTargeting,ActualTargetingBorderColor)
 		end
 	end
@@ -7160,6 +7160,7 @@ do
 					UpdateBox = true
 					UpdateBorders()
 					CreateHandles()
+					CreateBoxOfAllSelectedModels()
 				else
 					if Handles then
 						Handles:Destroy()
@@ -7632,6 +7633,7 @@ do
 					UpdateBox = true
 					UpdateBorders()
 					CreateHandles()
+					CreateBoxOfAllSelectedModels()
 				else
 					if Handles then
 						Handles:Destroy()
@@ -7814,6 +7816,7 @@ do
 					UpdateBox = true
 					UpdateBorders()
 					CreateHandles()
+					CreateBoxOfAllSelectedModels()
 				else
 					if Handles then
 						Handles:Destroy()
