@@ -5998,9 +5998,10 @@ do
 					) and 
 						Configurations.MultiSelectorBoxEnabled 
 				then
-					local Start = UIFuncs.ApplyGuiInset(UIFuncs.GetPointerPosition(),ScreenGui)
+					local Start = UIFuncs.GetPointerPosition()
+					local StartInset = UIFuncs.ApplyGuiInset(Start,ScreenGui)
 
-					Searcher.Position = UDim2.fromOffset(Start.X,Start.Y)
+					Searcher.Position = UDim2.fromOffset(StartInset.X,StartInset.Y)
 					Searcher.Size = UDim2.new(0, 0, 0, 0)
 					Searcher.Visible = true
 
@@ -6030,11 +6031,12 @@ do
 								ArrastrarJanitor:Destroy()
 								return
 							end
-							local End = UIFuncs.ApplyGuiInset(UIFuncs.GetPointerPosition(),ScreenGui)
+							local End = UIFuncs.GetPointerPosition()
+							local EndInset = UIFuncs.ApplyGuiInset(End,ScreenGui)
 
 							Searcher.Size = UDim2.fromOffset(
-								(End.X - Start.X),
-								-(End.Y - Start.Y)
+								(EndInset.X - StartInset.X),
+								-(EndInset.Y - StartInset.Y)
 							)
 
 							if TablaIterando then return end
