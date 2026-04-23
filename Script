@@ -5203,6 +5203,9 @@ do
 	end
 
 	local function SnapToGrid(value, grid)
+		if grid <= 0 then
+			grid = 0.0001
+		end
 		return math.floor((value / grid)) * grid
 	end
 
@@ -7724,6 +7727,7 @@ do
 						task.wait(0.0166666666667)
 					end
 					PushUndoObject(UndoInformation)
+					CreateBoxOfAllSelectedModels()
 
 					ToolsDisabled = false
 					OnToolsDisabledStateChanged:Fire()
@@ -9062,6 +9066,7 @@ do
 
 			function connection.Update(NewValue)
 				NewValue = tonumber(NewValue)
+				if not NewValue then return end
 
 				if math.isnan(NewValue) then
 					return
@@ -9145,7 +9150,7 @@ do
 				ToAdd.Order = order or 10
 				ToAdd.Updated = {connection.NumberChanged}
 				ToAdd.GetState = function()
-					return connection.DividedNumber
+					return connection.Number
 				end
 				ToAdd.Mobile = IsMobile or false
 				for i, child in ipairs(tools) do
