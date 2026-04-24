@@ -4937,6 +4937,8 @@ local Controls = {
 		Enum.KeyCode.Z,
 	},
 }
+
+-- tabla de Configurations123
 local Configurations = {
 	UIColor1 = Color3.fromRGB(255, 148, 148),
 	UIColor2 = Color3.fromRGB(163, 75, 75),
@@ -4952,7 +4954,7 @@ local Configurations = {
 	EstirarEnAmbosEjes = false,
 	EstirarProporcionalmente = false,
 	EstirarProporcionalmenteEnGrupo = false,
-	ResizearALaPosicionDelMouse = false,
+	ConfigurationIsChanged = false,
 	RemoveAutomaticallyLinksLimits = true,
 	CopiarConfiguracionesAlDuplicar = true,
 	CopiarConexionesAlDuplicar = true,
@@ -4963,6 +4965,8 @@ local Configurations = {
 	NotificacionAlPlayerLikear = true,
 	MultiSelectorBoxEnabled = false,
 	MultiSelectionEnabled = false,
+	PrecisionMode = false,
+	InverseSymetry = false,
 }
 local ConfigurationsConns = {}
 if not RunService:IsStudio() then
@@ -5209,7 +5213,7 @@ do
 		return math.floor((value / grid)) * grid
 	end
 
-	local function ConvertRaycastToCFrame(Raycast: RaycastResult, SizeOffset: Vector3, Cf: CFrame)
+	local function ConvertRaycastToCFrame(Raycast: RaycastResult, SizeOffset: Vector3, Cf: CFrame,Inverse:boolean?)
 		local position = Raycast.Position
 		local normal = Raycast.Normal.Unit
 
@@ -5223,6 +5227,10 @@ do
 			math.abs(right:Dot(normal)) * SizeOffset.X +
 			math.abs(up:Dot(normal)) * SizeOffset.Y +
 			math.abs(look:Dot(normal)) * SizeOffset.Z
+		
+		if Inverse then
+			projectedSize = -projectedSize
+		end
 
 		-- Ajuste hacia afuera de la superficie
 		local finalPos = position + normal * (projectedSize / 2)
@@ -6253,11 +6261,6 @@ do
 						nil,
 						child[6]
 					)
-					AddSelectedBlock(block,true,true)
-					if i == Max then
-						CreateBoxOfAllSelectedModels()
-						OnSelectedTargetsChanged:Fire()
-					end
 
 					local AnteriorReferencia = UndoChanges[i+1][1]
 					for _, UndoItemRecorrer in ipairs(UndoStack) do
@@ -6268,6 +6271,11 @@ do
 							ReplacementWait:Wait()
 						end
 						ReplacementWait:Wait()
+					end
+					AddSelectedBlock(block,true,true)
+					if i == Max then
+						CreateBoxOfAllSelectedModels()
+						OnSelectedTargetsChanged:Fire()
 					end
 				end)
 
@@ -7000,9 +7008,10 @@ do
 						if not RaycastResult then return end
 
 						local PrimaryPart = LastTarget.PrimaryPart
-						local FinalCf = ConvertRaycastToCFrame(RaycastResult,PrimaryPart.Size,PrimaryPart.CFrame)
+						local FinalCf = ConvertRaycastToCFrame(RaycastResult,PrimaryPart.Size,PrimaryPart.CFrame,Configurations.InverseSymetry)
 
 						distance = FinalCf.Position - InitialCf.Position
+									
 						if MoveToolIsLocal then
 							distance = InitialCf:VectorToObjectSpace(distance)
 						end
@@ -7017,13 +7026,17 @@ do
 							distance = -distance.Y
 						elseif Face == Enum.NormalId.Back then
 							distance = distance.Z
-						elseif Face == Enum.NormalId.Front then
+						elseif Face == Enum.NormalId.Front then	
 							distance = -distance.Z
 						end
 					else
 						if ActualToolGridState then
 							distance = SnapToGrid(distance, ToolGrid)
 						end
+					end
+
+					if Configurations.PrecisionMode then
+						distance /= 10
 					end
 
 					if Face == Enum.NormalId.Right then
@@ -7332,7 +7345,7 @@ do
 
 				HandleJanitor:Add(Handles.MouseDrag:Connect(function(Face, distance)
 
-					if Configurations.ResizearALaPosicionDelMouse then
+					if Configurations.ApuntarALaPosicionDelPuntero then
 						local RaycastResult = ActualTarget[5]
 						if not RaycastResult then return end
 
@@ -7371,6 +7384,11 @@ do
 							distance = -DiferencePositions.Z 
 						end
 					end
+
+					if Configurations.PrecisionMode then
+						distance /= 10
+					end
+					
 					distance = math.min(distance,2000)
 					if ActualToolGridState and ToolGrid > 0 then
 						distance = SnapToGrid(distance, ToolGrid)
@@ -7749,6 +7767,7 @@ do
 				end))
 
 				HandleJanitor:Add(Handles.MouseDrag:Connect(function(axis, angle)
+					
 					local Vec
 
 					if ActualToolGridState and ActualRotationGrid > 0 then
@@ -7761,6 +7780,10 @@ do
 						Vec = Vector3.new(0,1,0)
 					elseif axis == Enum.Axis.Z then
 						Vec = Vector3.new(0,0,1)
+					end
+
+					if Configurations.PrecisionMode then
+						angle /= 10
 					end
 
 					local rotation = CFrame.fromAxisAngle(Vec, angle)
@@ -8894,7 +8917,7 @@ do
 		BooleanExample.Visible = true
 		BooleanExample.Parent = nil
 		screenGuiJanitor:Add(BooleanExample)
-		function module.CreateBooleanSetting(Page:GuiObject,name:string,description:string,tools:{string},IsMobile:boolean?)
+		function module.CreateBooleanSetting(Page:GuiObject,name:string,description:string,tools:{string},IsMobile:boolean?,Order)
 
 			local connection = {}
 
@@ -8940,6 +8963,7 @@ do
 				ToAdd.Name = name
 				ToAdd.Type = "boolean"
 				ToAdd.Updated = {connection.StateChanged}
+				ToAdd.Order = Order or 10
 				ToAdd.GetState = function()
 					return ActualState
 				end
@@ -9127,7 +9151,10 @@ do
 
 			if tools then
 				local ToAdd = {}
-				ToAdd.Update = connection.Update
+				ToAdd.Update = function(number)
+					connection.Update(number)
+					ToolGrid = connection.Number
+				end
 				ToAdd.Name = name
 				ToAdd.Type = "number"
 				ToAdd.Order = order or 10
@@ -9606,6 +9633,10 @@ do
 			"The add tool and the destroy tool ignore invisible blocks.",
 			{
 				"add",
+				"rote",
+				"selection",
+				"resize",
+				"position",
 			}
 		)
 
@@ -9668,24 +9699,6 @@ do
 		MoveToolStateConn.SetState(MoveToolIsLocal)
 
 		--mover a la posicion en donde el cursor apunta
-		local PointToCursorConn = ConfigurationsFuncs.CreateBooleanSetting(
-			Page,
-			"Point to the cursor?",
-			"This allows you to make it point directly to the position of your cursor.",
-			{
-				"position",
-			}
-		)
-
-		screenGuiJanitor:Add(
-			PointToCursorConn.StateChanged.Event:Connect(function(State)
-				Configurations.ApuntarALaPosicionDelPuntero = State
-				Events.ConfigurationIsChanged:Fire("ApuntarALaPosicionDelPuntero")
-			end)
-		)
-		PointToCursorConn.SetState(Configurations.ApuntarALaPosicionDelPuntero)
-
-		--mover a la posicion en donde el cursor apunta
 		local CopyRotationInPointToCursor = ConfigurationsFuncs.CreateBooleanSetting(
 			Page,
 			"Copy rotation of target in point to cursor?",
@@ -9701,6 +9714,25 @@ do
 			end)
 		)
 		CopyRotationInPointToCursor.SetState(Configurations.CopiarRotacionEnMoveToolAlMoverAlPuntero)
+
+		--funcion de inversear simetria
+		local FuncionDeInversearSimetriaConn = ConfigurationsFuncs.CreateBooleanSetting(
+			Page,
+			"inverse symmetry?",
+			"Instead of pointing outwards, the symmetry function will point inwards.",
+			{
+				"position",
+			},
+			nil,
+			5
+		)
+
+		screenGuiJanitor:Add(
+			FuncionDeInversearSimetriaConn.StateChanged.Event:Connect(function(State)
+				Configurations.InverseSymetry = State
+			end)
+		)
+		FuncionDeInversearSimetriaConn.SetState(Configurations.InverseSymetry)
 
 
 
@@ -9767,23 +9799,6 @@ do
 			end)
 		)
 		ResizeProporcionalmente.SetState(Configurations.EstirarProporcionalmente)
-
-		--estirar desde la posicion en donde esta el cursor
-		local ResizeToCursorConn = ConfigurationsFuncs.CreateBooleanSetting(
-			Page,
-			"Resize to cursor position?",
-			"This will allow you to stretch the block exactly to where your cursor is currently pointing.",
-			{
-				"resize",
-			}
-		)
-
-		screenGuiJanitor:Add(
-			ResizeToCursorConn.StateChanged.Event:Connect(function(State)
-				Configurations.ResizearALaPosicionDelMouse = State
-			end)
-		)
-		ResizeToCursorConn.SetState(Configurations.ResizearALaPosicionDelMouse)
 
 
 
@@ -9944,7 +9959,49 @@ do
 				ActualToolGridState = State
 			end)
 		)
-		IgnoreToolGridConn.SetState(ActualToolGridState)		
+		IgnoreToolGridConn.SetState(ActualToolGridState)	
+
+		--funcion de simetria
+		local SymetricFunctionConn = ConfigurationsFuncs.CreateBooleanSetting(
+			Page,
+			"symmetry?",
+			"This option allows you to modify the block depending on the information under your cursor.",
+			{
+				"position",
+				"resize",
+			},
+			nil,
+			5
+		)
+
+		screenGuiJanitor:Add(
+			SymetricFunctionConn.StateChanged.Event:Connect(function(State)
+				Configurations.ApuntarALaPosicionDelPuntero = State
+				Events.ConfigurationIsChanged:Fire("ApuntarALaPosicionDelPuntero")
+			end)
+		)
+		SymetricFunctionConn.SetState(Configurations.ApuntarALaPosicionDelPuntero)
+
+		--funcion de precision
+		local FuncionDePrecisionConn = ConfigurationsFuncs.CreateBooleanSetting(
+			Page,
+			"Precision mode?",
+			"The movement, resizing, and other functions will be much smaller when moving",
+			{
+				"position",
+				"resize",
+				"rote",
+			},
+			nil,
+			5
+		)
+
+		screenGuiJanitor:Add(
+			FuncionDePrecisionConn.StateChanged.Event:Connect(function(State)
+				Configurations.PrecisionMode = State
+			end)
+		)
+		FuncionDePrecisionConn.SetState(Configurations.PrecisionMode)
 
 		--toolgrid
 
@@ -10297,19 +10354,6 @@ do
 					EstadosAnteriores.MultiSelect = nil
 				end
 
-				--resize a la posicion del cursor
-				if 
-					ControlsManager.CheckIfIsPressing(Controls.ResizeToCursorPoint)
-				then
-					if EstadosAnteriores.ResizeToCursorPoint == nil then
-						EstadosAnteriores.ResizeToCursorPoint = Configurations.ResizearALaPosicionDelMouse
-					end
-					ResizeToCursorConn.SetState(not EstadosAnteriores.ResizeToCursorPoint)
-				elseif EstadosAnteriores.ResizeToCursorPoint ~= nil then
-					ResizeToCursorConn.SetState(EstadosAnteriores.ResizeToCursorPoint)
-					EstadosAnteriores.ResizeToCursorPoint = nil
-				end
-
 				--posicionar a la posicion del cursor
 				if 
 					ControlsManager.CheckIfIsPressing(Controls.ChangeMovementToCursor)
@@ -10317,9 +10361,9 @@ do
 					if EstadosAnteriores.ChangeMovementToCursor == nil then
 						EstadosAnteriores.ChangeMovementToCursor = Configurations.ApuntarALaPosicionDelPuntero
 					end
-					PointToCursorConn.SetState(not EstadosAnteriores.ChangeMovementToCursor)
+					SymetricFunctionConn.SetState(not EstadosAnteriores.ChangeMovementToCursor)
 				elseif EstadosAnteriores.ChangeMovementToCursor ~= nil then
-					PointToCursorConn.SetState(EstadosAnteriores.ChangeMovementToCursor)
+					SymetricFunctionConn.SetState(EstadosAnteriores.ChangeMovementToCursor)
 					EstadosAnteriores.ChangeMovementToCursor = nil
 				end
 
@@ -11039,12 +11083,16 @@ do
 	do
 		local Page = ConfigurationsFuncs.GetPage("Update logs")
 
-		ConfigurationsFuncs.CreateTextSetting(
-			Page,
-			"version 2.2.6"
-		)
-
 		local Changes = {
+
+			{
+				"2.2.7",
+				{
+					"▫️Bug fixes",
+					"▫️New configurations",
+				}
+
+			},
 
 			{
 				"2.2.6",
@@ -11169,6 +11217,11 @@ do
 
 
 		}
+
+		ConfigurationsFuncs.CreateTextSetting(
+			Page,
+			"Actual Version: v" .. Changes[1][1]
+		)
 
 		for _, Data in ipairs(Changes) do
 			local ChangesVersion = Data[1]
