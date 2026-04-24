@@ -8004,14 +8004,6 @@ do
 		newmodel:PivotTo(CF*Offset)
 		ApuntaCamaraToItem(ViewPortFrame,Camera,newmodel)
 
-		local Rotacion = 0
-		AddToClean(RunService.Heartbeat:Connect(function(delta)
-			Rotacion += math.rad(delta*45)
-			newmodel:PivotTo(
-				(CF * CFrame.Angles(0,Rotacion,0)) * Offset
-			)
-		end))
-
 		for i, child in ipairs(newmodel:GetDescendants()) do
 			if child:IsA("BasePart") and (child.Name == "ColorPart" or child:HasTag("Colorable")) then
 				child.BrickColor = ActualBrickColor
@@ -8167,21 +8159,6 @@ do
 		local ModelClon2 = clon:FindFirstChildOfClass("ViewportFrame"):FindFirstChildOfClass("Model")
 		AddToClean(clon.MouseButton1Up:Connect(function()
 			SetActualCreationModel(Model)
-		end))
-
-		local deltaacumulada = 0
-		local Rotacion = 0
-		AddToClean(RunService.Heartbeat:Connect(function(delta)
-			deltaacumulada += delta
-			if deltaacumulada < 0.1 then return end
-
-			Rotacion += math.rad(45*deltaacumulada)
-			local Pivot = (CF * CFrame.Angles(0,Rotacion,0)) * Offset
-
-			ModelClon:PivotTo(Pivot)
-			ModelClon2:PivotTo(Pivot)
-
-			deltaacumulada -= 0.1
 		end))
 
 		UIFuncs.SetExtraInformationMessage(TextLabel,FriendlyName)
