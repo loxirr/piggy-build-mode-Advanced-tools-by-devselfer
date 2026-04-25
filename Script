@@ -14,6 +14,7 @@ local CollectionService = game:GetService("CollectionService")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 local Mouse = Player:GetMouse()
+local CurrentCamera = workspace:WaitForChild("Camera")
 
 --Variable para limitar velocidad de construccion
 local BuildId = 0
@@ -4700,6 +4701,20 @@ local ControlsManager = (function()
 	return module
 end)()
 
+local Mobile = (function()
+	local module = {}
+	
+	function module.SensibilityState(state)
+		if UserInputService.TouchEnabled and not state then
+			CurrentCamera.CameraType = Enum.CameraType.Scriptable
+		else
+			CurrentCamera.CameraType = Enum.CameraType.Custom
+		end
+	end
+	
+	return module
+end)()
+
 local function CheckScreenGui()
 	if not ScreenGui or not ScreenGui.Parent then
 		return false
@@ -5043,7 +5058,6 @@ do
 	local Excluded = {}
 	local TemporalExclude = {}
 	local TransparentBlocks = {}
-	local CurrentCamera = workspace:WaitForChild("Camera")
 	local ActualTarget = {}
 	local SelectedTargets = {}
 	local SelectedConns = {}
@@ -6485,39 +6499,49 @@ do
 								end
 
 								if ConectarDeExteriorAInterior then
-									local function CheckIfEnded()
-										local allended = true
-										for _, ended in ipairs(Ended) do
-											if not ended then
-												allended = false
-												break
-											end
-										end
-										return allended
-									end
-									while true do
-										task.wait(0.0166666667)
-										local AllEnded = CheckIfEnded()
-										if AllEnded then 
-											task.wait(0.0166666667)
-											AllEnded = CheckIfEnded()
-											if AllEnded then 
-												task.wait(0.0166666667)
-												AllEnded = CheckIfEnded()
-												if AllEnded then
+									local function WaitForEnded(Table)
+										local function CheckIfEnded()
+											local allended = true
+											for _, ended in ipairs(Table) do
+												if not ended then
+													allended = false
 													break
+												end
+											end
+											return allended
+										end
+										while true do
+											task.wait()
+											local AllEnded = CheckIfEnded()
+											if AllEnded then 
+												task.wait()
+												AllEnded = CheckIfEnded()
+												if AllEnded then 
+													task.wait()
+													AllEnded = CheckIfEnded()
+													if AllEnded then
+														break
+													end
 												end
 											end
 										end
 									end
+									WaitForEnded(Ended)
+									local Ended2 = {}
+									local Index = 0
 									for parentLink, parentConnections in pairs(ParentsLinks) do
 										if not parentLink or not parentLink.Parent then continue end
+										Index += 1
+										local actualindex = Index
+										Ended2[actualindex] = false
 										task.spawn(function()
 											RemotesSimplificados.SetConnections(parentLink, parentConnections)
+											Ended2[actualindex] = true
 										end)
 
 										task.wait(0.01666666667)
 									end
+									WaitForEnded(Ended2)
 								end
 
 								Notification.Notify("Connections copied!")
@@ -6978,8 +7002,10 @@ do
 
 				local HandlesIsPressing = false
 				HandleJanitor:Add(Handles.MouseButton1Down:Connect(function()
+					Mobile.SensibilityState(false)
 					MultiSelectEnabled = false
 					HandlesIsPressing = true
+
 
 					for i, child in ipairs(SelectedTargets) do
 						child:SetAttribute("InitialPosition", child:GetPivot())
@@ -6990,7 +7016,9 @@ do
 					LastDistance = 0
 				end))
 				HandleJanitor:Add(Handles.MouseButton1Up:Connect(function()
+					Mobile.SensibilityState(true)
 					HandlesIsPressing = false
+
 				end))
 
 				HandleJanitor:Add(function()
@@ -7274,8 +7302,10 @@ do
 				end))
 
 				HandleJanitor:Add(Handles.MouseButton1Down:Connect(function()
+					Mobile.SensibilityState(false)
 					MultiSelectEnabled = false
 					AddActualSelectedToExclude = true
+
 					for i, child in ipairs(SelectedTargets) do
 						child:SetAttribute("InitialScale",child:GetScale())
 						child:SetAttribute("InitialSize",child:GetExtentsSize())
@@ -7288,9 +7318,7 @@ do
 				end))
 
 				HandleJanitor:Add(Handles.MouseButton1Up:Connect(function()
-
-					AddActualSelectedToExclude = false
-					MultiSelectEnabled = true
+					Mobile.SensibilityState(true)
 
 					local FinalSizeTarget = Act:GetExtentsSize()
 					local DiferenceSize = (FinalSizeTarget - InitialSize).Magnitude
@@ -7300,6 +7328,10 @@ do
 
 					if ToolsDisabled then return end
 					ToolsDisabled = true
+
+					AddActualSelectedToExclude = false
+					MultiSelectEnabled = true
+					
 					HandleJanitor:Destroy()
 					OnToolsDisabledStateChanged:Fire()
 
@@ -7703,6 +7735,7 @@ do
 				end))
 
 				HandleJanitor:Add(Handles.MouseButton1Up:Connect(function()
+					Mobile.SensibilityState(true)
 					local FinalRotationAct = Act:GetPivot().Rotation :: CFrame
 					local InitialRotationAct = InitialPivot.Rotation :: CFrame
 					local Diference = (Vector3.new(InitialRotationAct:ToEulerAnglesYXZ()) - Vector3.new(FinalRotationAct:ToEulerAnglesYXZ())).Magnitude
@@ -7757,6 +7790,7 @@ do
 				end))
 
 				HandleJanitor:Add(Handles.MouseButton1Down:Connect(function()
+					Mobile.SensibilityState(false)
 					UpdateBox = false
 					MultiSelectEnabled = false
 					InitialPivot = Act:GetPivot()
@@ -11255,6 +11289,13 @@ do
 				"loxirr/devselfer-Creator",
 				{
 					"Basically the designer of almost everything",
+				}
+			},
+
+			{
+				"guest 666-Tester",
+				{
+					"Testing",
 				}
 			},
 
