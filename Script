@@ -242,154 +242,6 @@ local function ResizeModel(Model: Model, NewSize: Vector3)
 	Model:PivotTo(PivotAnterior)
 end
 
---basic build functions
-local RemotesSimplificados = (function() 
-	local Functions = {}
-
-	local Folder = ReplicatedStorage:FindFirstChild("Functions")
-
-	local BuildRemote = Folder:FindFirstChild("PlaceBlock")
-	local DestroyRemote = Folder:FindFirstChild("DestroyBlock")
-	local ResizeRemote = Folder:FindFirstChild("CommitResize")
-	local MoveRemote = Folder:FindFirstChild("CommitMove")
-	local FillRemote = Folder:FindFirstChild("FillBlock")
-	local UpdateBlockSettings = Folder:FindFirstChild("UpdateBlockSettings")
-	local UpdateBlockLink = Folder:FindFirstChild("UpdateBlockLink")
-	local GetParentLinks = Folder:FindFirstChild("GetParentLinks")
-	local GetChildLinks = Folder:FindFirstChild("GetChildLinks")
-	local Kick = Folder:FindFirstChild("Kick")
-
-	function Functions.Build(
-		block:Model,
-		Position:CFrame,
-		Color:BrickColor,
-		Material:Enum.Material
-	)
-		return BuildRemote:InvokeServer(
-			block,
-			Position,
-			Color,
-			Material
-		)
-
-	end
-
-	function Functions.Fill(
-		block:Model,
-		Color:BrickColor,
-		Material:Enum.Material
-	)
-		return FillRemote:InvokeServer(
-			block,
-			Color,
-			Material
-		)
-	end
-
-	function Functions.GetConfigs(
-		block:Model
-	): (BrickColor,string)
-		return block:GetAttribute("Color"), block:GetAttribute("Material")
-	end
-
-	function Functions.Destroy(
-		block:Model
-	)
-		return DestroyRemote:InvokeServer(
-			block
-		)
-
-	end
-
-	function Functions.Resize(
-		block:Model,
-		Position:CFrame,
-		Size:Vector3
-	)
-		block:PivotTo(Position)
-		ResizeModel(block,Size)
-
-		local Children = block:GetChildren()
-
-		local RealChildren = table.create(#Children)
-		for i, child in ipairs(Children) do
-			if child:IsA("BasePart") then
-				RealChildren[#RealChildren+1] = child
-			end
-		end
-		local Data = table.create(#RealChildren*3)
-		for i, child in ipairs(RealChildren) do
-			local realI = i*3
-			Data[realI-2] = child
-			Data[realI-1] = child.CFrame
-			Data[realI] = child.Size
-		end
-
-		local success, data = pcall(function()			
-			return ResizeRemote:InvokeServer(
-				block,
-				Data
-			)
-		end)
-
-		if success then
-			return data
-		else
-			warn("Error al redimensionar el bloque:", data) -- Muestra el mensaje de error
-		end
-
-	end
-
-	function Functions.Move(
-		block:Model,
-		Position:CFrame
-	)
-		return MoveRemote:InvokeServer(
-			block,
-			Position
-		)
-
-	end
-
-	function Functions.SetSettings(
-		block:Model,
-		TableOfConfigurations:{
-			[string]:any
-		}
-	)
-		UpdateBlockSettings:InvokeServer(block,TableOfConfigurations)
-	end
-
-	function Functions.SetConnections(
-		block:Model,
-		TableOfConnections:{
-			[number]:Model
-		}
-	)
-		UpdateBlockLink:InvokeServer(block,TableOfConnections)
-	end
-
-	function Functions.GetParentConnections(
-		block:Model
-	)
-		return GetParentLinks:InvokeServer(block)
-	end
-
-	function Functions.GetChildConnections(
-		block:Model
-	)
-		return GetChildLinks:InvokeServer(block)
-	end
-	
-	function Functions.KickPlayer(
-		Player:Player
-	)
-		return Kick:InvokeServer(Player)
-	end
-
-	return Functions
-end)()
-
 --Screengui
 local ScreenGui = nil ::ScreenGui
 do			
@@ -4550,6 +4402,159 @@ local Notification = (function()
 	end
 
 	return Notification
+end)()
+
+
+--basic build functions
+local RemotesSimplificados = (function() 
+	local Functions = {}
+
+	local Folder = ReplicatedStorage:FindFirstChild("Functions")
+
+	local BuildRemote = Folder:FindFirstChild("PlaceBlock")
+	local DestroyRemote = Folder:FindFirstChild("DestroyBlock")
+	local ResizeRemote = Folder:FindFirstChild("CommitResize")
+	local MoveRemote = Folder:FindFirstChild("CommitMove")
+	local FillRemote = Folder:FindFirstChild("FillBlock")
+	local UpdateBlockSettings = Folder:FindFirstChild("UpdateBlockSettings")
+	local UpdateBlockLink = Folder:FindFirstChild("UpdateBlockLink")
+	local GetParentLinks = Folder:FindFirstChild("GetParentLinks")
+	local GetChildLinks = Folder:FindFirstChild("GetChildLinks")
+	local Kick = Folder:FindFirstChild("Kick")
+
+	function Functions.Build(
+		block:Model,
+		Position:CFrame,
+		Color:BrickColor,
+		Material:Enum.Material
+	)
+		return BuildRemote:InvokeServer(
+			block,
+			Position,
+			Color,
+			Material
+		)
+
+	end
+
+	function Functions.Fill(
+		block:Model,
+		Color:BrickColor,
+		Material:Enum.Material
+	)
+		return FillRemote:InvokeServer(
+			block,
+			Color,
+			Material
+		)
+	end
+
+	function Functions.GetConfigs(
+		block:Model
+	): (BrickColor,string)
+		return block:GetAttribute("Color"), block:GetAttribute("Material")
+	end
+
+	function Functions.Destroy(
+		block:Model
+	)
+		return DestroyRemote:InvokeServer(
+			block
+		)
+
+	end
+
+	function Functions.Resize(
+		block:Model,
+		Position:CFrame,
+		Size:Vector3
+	)
+		block:PivotTo(Position)
+		ResizeModel(block,Size)
+
+		local Children = block:GetChildren()
+
+		local RealChildren = table.create(#Children)
+		for i, child in ipairs(Children) do
+			if child:IsA("BasePart") then
+				RealChildren[#RealChildren+1] = child
+			end
+		end
+		local Data = table.create(#RealChildren*3)
+		for i, child in ipairs(RealChildren) do
+			local realI = i*3
+			Data[realI-2] = child
+			Data[realI-1] = child.CFrame
+			Data[realI] = child.Size
+		end
+
+		local success, data = pcall(function()			
+			return ResizeRemote:InvokeServer(
+				block,
+				Data
+			)
+		end)
+
+		if success then
+			return data
+		else
+			warn("Error al redimensionar el bloque:", data) -- Muestra el mensaje de error
+		end
+
+	end
+
+	function Functions.Move(
+		block:Model,
+		Position:CFrame
+	)
+		return MoveRemote:InvokeServer(
+			block,
+			Position
+		)
+
+	end
+
+	function Functions.SetSettings(
+		block:Model,
+		TableOfConfigurations:{
+			[string]:any
+		}
+	)
+		UpdateBlockSettings:InvokeServer(block,TableOfConfigurations)
+	end
+
+	function Functions.SetConnections(
+		block:Model,
+		TableOfConnections:{
+			[number]:Model
+		}
+	)
+		UpdateBlockLink:InvokeServer(block,TableOfConnections)
+	end
+
+	function Functions.GetParentConnections(
+		block:Model
+	)
+		return GetParentLinks:InvokeServer(block)
+	end
+
+	function Functions.GetChildConnections(
+		block:Model
+	)
+		return GetChildLinks:InvokeServer(block)
+	end
+
+	function Functions.KickPlayer(
+		Player:Player
+	)
+		local result = Kick:InvokeServer(Player.Name)
+		
+		Notification.Notify(result)
+		
+		return result
+	end
+
+	return Functions
 end)()
 
 --UI funcs
@@ -11826,8 +11831,8 @@ do
 					"▫️Notification sounds, tools colors and bar colors are now configurable",
 					"▫️Notification sounds and bar are now configurable",
 					"▫️Waypoint system created",
-					"Ban system created",
-					"script icon created",	
+					"▫️Ban system created",
+					"▫️script icon created",	
 				}
 
 			},
