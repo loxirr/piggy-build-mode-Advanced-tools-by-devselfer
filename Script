@@ -6601,22 +6601,35 @@ do
 		elseif id == "DuplicateTask" then
 			if not ActualSelectedTargetingColor then return end
 			if #SelectedTargets > 0 then
+				
+				--primeramente desactivar todas las demas herramientas
 				if ToolsDisabled then return end
 				ToolsDisabled = true
 				OnToolsDisabledStateChanged:Fire()
-
+				
+				--clonar la tabla para evitar que el duplicado se modifique mientras se esta duplicando
 				local TableToSelect = table.clone(SelectedTargets)
-
-				local OldLinks = {}
-
+				
+				--tablas que serviran para guardar los links de los bloques clonados
+				local OldLinks2 = {}
+				
+				--informacion de undo
 				local UndoInformation = CreateUndoObject()
 				UndoInformation.Type = "add"
 				UndoInformation.Changes = {TableToSelect}
 				local cached = UndoInformation.Changes
+				
+				--deseleccionar todo
 				DeselectAll()
+				
+				--clonar los bloques
 				local Max = #TableToSelect
 				for i, child in ipairs(TableToSelect) do
+					
+					--task spawn para empezar la peticion
 					task.spawn(function()
+						
+						--conseguir la informacion y crear el bloque
 						local Pos = child:GetPivot()
 						local Size = child:GetExtentsSize()
 						local color = child:GetAttribute("Color")
@@ -6632,10 +6645,11 @@ do
 							nil,
 							child:FindFirstChild("Configuration")
 						)
-
+						
+						--si el bloque se logro crear pues configurarlo y todo
 						if block then
 							if CheckIfIsLink(child) then
-								OldLinks[child] = block
+								OldLinks2[child] = block
 							end
 
 							AddSelectedBlock(block,true,true)
@@ -6648,28 +6662,37 @@ do
 								material
 							})
 						end
-
+						
+						--si es el ultimo ciclo, empezar segundo procedimiento para conectar todos los links
 						if i == Max then
-							if Configurations.CopiarConexionesAlDuplicar and next(OldLinks) then
+							if Configurations.CopiarConexionesAlDuplicar and next(OldLinks2) then
 
+								Notification.Notify("Copying connections...")
+								
+								--tomar las configuraciones y y ponerlas en variables para evitar que el jugador cambie mientras se esta duplicando
 								local ConectarDeInteriorAinterior = Configurations.CopiarConexionesDeInteriorAInterior	
 								local ConectarDeInteriorAExterior = Configurations.CopiarConexionesDeInteriorAExterior
 								local ConectarDeExteriorAInterior = Configurations.CopiarConexionesDeExteriorAinterior
-
-								Notification.Notify("Copying connections...")
-
+								
+								--crear tablas para guardar los links padres que se tendran que conectar al final de todo el proceso
 								local ParentsLinks = {}
-								local Index = 1
-								local Ended = {}
-
-								for OldLink, NewLink in pairs(OldLinks) do
-									if not OldLink or not OldLink.Parent or not NewLink or not NewLink.Parent then continue end
-
-									local ActualIndex = Index
-									Ended[ActualIndex] = false
-
-									task.wait(0.06666666666666666666666666666667)
-
+								local index = 0
+								for _,_ in pairs(OldLinks2) do
+									index += 1
+								end
+								local Ended = table.create(index,false)
+								local changingParentsLinks = false
+								local function WaitForChangingParentsLinksBoolean()
+									while changingParentsLinks do
+										task.wait()
+									end
+								end
+								
+								index = 0
+								for OldLink, NewLink in pairs(OldLinks2) do
+									index += 1
+									local actualindex = index
+									
 									task.spawn(function()
 
 										-- =========================
@@ -6680,7 +6703,7 @@ do
 											local NewLinkConnections = {}
 
 											for _, child in ipairs(RemotesSimplificados.GetChildConnections(OldLink)) do
-												local mapped = OldLinks[child]
+												local mapped = OldLinks2[child]
 
 												if mapped then
 													if ConectarDeInteriorAinterior then
@@ -6700,69 +6723,71 @@ do
 										-- PADRES (Parent connections)
 										-- =========================
 										if ConectarDeExteriorAInterior then
-											for _, parentLink in ipairs(RemotesSimplificados.GetParentConnections(OldLink)) do
-												if OldLinks[parentLink] then continue end
-
-												local parentConnections = ParentsLinks[parentLink] or RemotesSimplificados.GetChildConnections(parentLink)
-
-												-- Evitar duplicados
-												parentConnections[#parentConnections+1] = NewLink
-												ParentsLinks[parentLink] = parentConnections
+											for i, parentLink in ipairs(RemotesSimplificados.GetParentConnections(OldLink)) do
+												if OldLinks2[parentLink] then continue end
+												WaitForChangingParentsLinksBoolean()
+												changingParentsLinks = true
+												
+												local parentConnections = ParentsLinks[parentLink]
+												if not parentConnections then
+													parentConnections = RemotesSimplificados.GetChildConnections(parentLink)
+													ParentsLinks[parentLink] = parentConnections
+												end
+												
+												parentConnections[#parentConnections + 1] = NewLink
+												changingParentsLinks = false
 											end
 										end
 
-										Ended[ActualIndex] = true
+										Ended[actualindex] = true
 
 									end)
 
-									Index += 1
+									task.wait(0.016666667)
 								end
 
-								if ConectarDeExteriorAInterior then
-									local function WaitForEnded(Table)
-										local function CheckIfEnded()
-											local allended = true
-											for _, ended in ipairs(Table) do
-												if not ended then
-													allended = false
-													break
-												end
-											end
-											return allended
-										end
-										while true do
-											task.wait()
-											local AllEnded = CheckIfEnded()
-											if AllEnded then 
-												task.wait()
-												AllEnded = CheckIfEnded()
-												if AllEnded then 
-													task.wait()
-													AllEnded = CheckIfEnded()
-													if AllEnded then
-														break
-													end
-												end
+								local function WaitForEnded(Table)
+									local function CheckIfEnded()
+										local allended = true
+										for i = #Table, 1, -1 do
+											if not Table[i] then
+												allended = false
+												break
 											end
 										end
+										return allended
 									end
-									WaitForEnded(Ended)
-									local Ended2 = {}
-									local Index = 0
-									for parentLink, parentConnections in pairs(ParentsLinks) do
-										if not parentLink or not parentLink.Parent then continue end
-										Index += 1
-										local actualindex = Index
-										Ended2[actualindex] = false
+									while true do
+										if CheckIfEnded() then
+											break
+										end
+										task.wait()
+									end
+									table.clear(Table)
+								end
+								WaitForEnded(Ended)
+								
+								if ConectarDeExteriorAInterior then
+									local index = 0
+									for _,_ in pairs(ParentsLinks) do 
+										index += 1
+									end
+									local Ended2 = table.create(index,false)
+									index = 0
+									for ParentLink, ParentConnections in pairs(ParentsLinks) do 
+										index += 1
+										local actualindex = index
 										task.spawn(function()
-											RemotesSimplificados.SetConnections(parentLink, parentConnections)
+											RemotesSimplificados.SetConnections(ParentLink, ParentConnections)
 											Ended2[actualindex] = true
 										end)
-
-										task.wait(0.01666666667)
+										task.wait(0.016666667)
 									end
 									WaitForEnded(Ended2)
 								end
+
+								table.clear(ParentsLinks)
+								table.clear(OldLinks2)
 
 								Notification.Notify("Connections copied!")
 							end
@@ -6775,6 +6800,8 @@ do
 							ToolsDisabled = false
 							OnToolsDisabledStateChanged:Fire()
 						end
+						
+						
 					end)
 
 					task.wait(0.0166666666667)
@@ -11817,6 +11844,14 @@ do
 		local Page = ConfigurationsFuncs.GetPage("Update logs")
 
 		local Changes = {
+
+			{
+				"2.3.8",
+				{
+					"▫️Improved duplicate system with links, it works 4 times more efficiently than before.",
+				}
+
+			},
 
 			{
 				"2.3.7",
