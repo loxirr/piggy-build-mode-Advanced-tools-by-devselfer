@@ -177,85 +177,75 @@ local Janitor = (function()
 	return Janitor :: Janitor
 end)()
 
-
-local function ResizeModel(Model: Model, NewSize: Vector3,ScaleX:number?,ScaleY:number?,ScaleZ:number?)
-	local initialSize = Model:GetAttribute("InitialSizeForFunction")
-	local pivot = Model:GetAttribute("InitialPivotForFunction")
-
-	if not initialSize or not pivot then 
-		pivot = Model:GetPivot()
-		initialSize = Model:GetExtentsSize()
-		Model:SetAttribute("InitialPivotForFunction", pivot)
-		Model:SetAttribute("InitialSizeForFunction", initialSize)
-
-		for _, child in ipairs(Model:GetDescendants()) do
-			if child:IsA("BasePart") and not child:HasTag("Input") then
-				child:SetAttribute("InitialSizeForFunction", child.Size)
-
-				-- Guardamos el CFrame relativo al pivot
-				local relativeCFrame = pivot:ToObjectSpace(child.CFrame)
-				child:SetAttribute("RelativeCfForFunction", relativeCFrame)
-			end
-		end
-	end
-
-	local PivotAnterior = Model:GetPivot()
-	Model:PivotTo(pivot)
-	
-	if NewSize then
-		local SizeDiference = Vector3.new(
-			NewSize.X-initialSize.X,
-			NewSize.Y-initialSize.Y,
-			NewSize.Z-initialSize.Z
-		)
-		for _, child in ipairs(Model:GetDescendants()) do
-			if child:IsA("BasePart") and not child:HasTag("Input") then
-				local initialSizePart = child:GetAttribute("InitialSizeForFunction")
-				child.Size = initialSizePart + SizeDiference
-			end
-		end
-		local scale = Vector3.new(
-			math.abs(NewSize.X / initialSize.X),
-			math.abs(NewSize.Y / initialSize.Y),
-			math.abs(NewSize.Z / initialSize.Z)
-		)
-		Model:SetAttribute("ActualScaleForFunction", scale)
-	else
-		local scale = Vector3.new(
-			math.abs(ScaleX),
-			math.abs(ScaleY),
-			math.abs(ScaleZ)
-		)
-		Model:SetAttribute("ActualScaleForFunction", scale)
-		
-		NewSize = initialSize * scale
-
-		local SizeDiference = Vector3.new(
-			NewSize.X-initialSize.X,
-			NewSize.Y-initialSize.Y,
-			NewSize.Z-initialSize.Z
-		)
-		for _, child in ipairs(Model:GetDescendants()) do
-			if child:IsA("BasePart") and not child:HasTag("Input") then
-				local initialSizePart = child:GetAttribute("InitialSizeForFunction")
-				child.Size = initialSizePart * scale
-			end
-		end
-	end
-
-	Model:PivotTo(PivotAnterior)
+local function safeDiv(a, b)
+	return b ~= 0 and a / b or 0
 end
 
-local function GetScale(Model)
-	local scale = Model:GetAttribute("ActualScaleForFunction")
-	if not scale then
-		scale = Vector3.new(1,1,1)
-		Model:SetAttribute("ActualScaleForFunction", scale)
+local function GetScale(Model: Model,Size:Vector3?)
+
+	local function UpdateBasicPropertys(Model)
+		local initialSize = Model:GetAttribute("InitialSizeForFunction")
+		local ActualSize = Model:GetExtentsSize()
+
+		if not initialSize then 
+			initialSize = Model:GetExtentsSize()
+			Model:SetAttribute("InitialSizeForFunction", initialSize)
+
+			for _, child in ipairs(Model:GetDescendants()) do
+				if child:IsA("BasePart") then
+					child:SetAttribute("InitialSizeForFunction", child.Size)
+				end
+			end
+		end
+
+		return initialSize,ActualSize
 	end
-	return scale
+	 
+	local initialSize,ActualSize = UpdateBasicPropertys(Model)
+
+	local NewScale
+
+	NewScale = Vector3.new(
+		math.max(safeDiv((Size or ActualSize).X, initialSize.X),0),
+		math.max(safeDiv((Size or ActualSize).Y, initialSize.Y),0),
+		math.max(safeDiv((Size or ActualSize).Z, initialSize.Z),0)
+	)
+	Model:SetAttribute("ActualScaleForFunction", NewScale)
+
+	return NewScale, initialSize,ActualSize
+end
+
+local function ResizeModel(Model: Model, Size:Vector3, IsScale:boolean?,ChangesPosition:boolean?)
+	local NewScale
+	if IsScale then
+		NewScale = Size
+	else
+		NewScale,_,_ = GetScale(Model,Size)
+	end
+
+	for _, child in ipairs(Model:GetDescendants()) do
+		if child:IsA("BasePart") then
+			local initial = child:GetAttribute("InitialSizeForFunction")
+			child.Size = Vector3.new(
+				initial.X * NewScale.X,
+				initial.Y * NewScale.Y,
+				initial.Z * NewScale.Z
+			)
+		end
+	end
 end
 
 --Screengui
+--
+--
+--
+--
+--
+--
+--
+--siempre se me pierde puta screengui
+--
+--
 local ScreenGui = nil ::ScreenGui
 do			
 	if RunService:IsStudio() then
@@ -306,10 +296,10 @@ do
 			instances["ScrollingFrame"]:AddTag("BarColor")
 			instances["ScrollingFrame"]:AddTag("BarTransparency")
 
-			instances["UIListLayout2"] = Instance.new("UIListLayout")
-			instances["UIListLayout2"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout2"].Padding = UDim.new(0, 6)
-			instances["UIListLayout2"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout3"] = Instance.new("UIListLayout")
+			instances["UIListLayout3"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout3"].Padding = UDim.new(0, 6)
+			instances["UIListLayout3"].SortOrder = Enum.SortOrder.LayoutOrder
 
 			instances["tools"] = Instance.new("TextButton")
 			instances["tools"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
@@ -324,7 +314,7 @@ do
 			instances["tools"]:AddTag("UIColor2")
 			instances["tools"]:AddTag("UITransparency2")
 
-			instances["UICorner20"] = Instance.new("UICorner")
+			instances["UICorner21"] = Instance.new("UICorner")
 
 			instances["none2"] = Instance.new("ImageLabel")
 			instances["none2"].Active = true
@@ -464,7 +454,7 @@ do
 			instances["color"]:AddTag("UIColor2")
 			instances["color"]:AddTag("UITransparency2")
 
-			instances["UICorner21"] = Instance.new("UICorner")
+			instances["UICorner22"] = Instance.new("UICorner")
 
 			instances["Frame"] = Instance.new("Frame")
 			instances["Frame"].Active = true
@@ -475,8 +465,8 @@ do
 			instances["Frame"].Position = UDim2.new(0.5, 0, 0.5, 0)
 			instances["Frame"].Size = UDim2.new(0.8, 0, 0.8, 0)
 
-			instances["UICorner44"] = Instance.new("UICorner")
-			instances["UICorner44"].CornerRadius = UDim.new(0, 12)
+			instances["UICorner45"] = Instance.new("UICorner")
+			instances["UICorner45"].CornerRadius = UDim.new(0, 12)
 
 			instances["UIAspectRatioConstraint8"] = Instance.new("UIAspectRatioConstraint")
 
@@ -494,7 +484,7 @@ do
 			instances["material"]:AddTag("UIColor2")
 			instances["material"]:AddTag("UITransparency2")
 
-			instances["UICorner22"] = Instance.new("UICorner")
+			instances["UICorner23"] = Instance.new("UICorner")
 
 			instances["Frame2"] = Instance.new("ViewportFrame")
 			instances["Frame2"].Active = true
@@ -507,8 +497,8 @@ do
 			instances["Frame2"].Position = UDim2.new(0.5, 0, 0.5, 0)
 			instances["Frame2"].Size = UDim2.new(1, 0, 1, 0)
 
-			instances["UICorner45"] = Instance.new("UICorner")
-			instances["UICorner45"].CornerRadius = UDim.new(0, 12)
+			instances["UICorner46"] = Instance.new("UICorner")
+			instances["UICorner46"].CornerRadius = UDim.new(0, 12)
 
 			instances["Model"] = Instance.new("Model")
 
@@ -536,7 +526,7 @@ do
 			instances["settings"]:AddTag("UIColor2")
 			instances["settings"]:AddTag("UITransparency2")
 
-			instances["UICorner23"] = Instance.new("UICorner")
+			instances["UICorner24"] = Instance.new("UICorner")
 
 			instances["add3"] = Instance.new("ImageLabel")
 			instances["add3"].Active = true
@@ -566,7 +556,7 @@ do
 			instances["models"]:AddTag("UIColor2")
 			instances["models"]:AddTag("UITransparency2")
 
-			instances["UICorner24"] = Instance.new("UICorner")
+			instances["UICorner25"] = Instance.new("UICorner")
 
 			instances["Frame3"] = Instance.new("ViewportFrame")
 			instances["Frame3"].Active = true
@@ -579,8 +569,8 @@ do
 			instances["Frame3"].Position = UDim2.new(0.5, 0, 0.5, 0)
 			instances["Frame3"].Size = UDim2.new(1, 0, 1, 0)
 
-			instances["UICorner46"] = Instance.new("UICorner")
-			instances["UICorner46"].CornerRadius = UDim.new(0, 12)
+			instances["UICorner47"] = Instance.new("UICorner")
+			instances["UICorner47"].CornerRadius = UDim.new(0, 12)
 
 			instances["Camera"] = Instance.new("Camera")
 			instances["Camera"].CFrame = CFrame.new(38.971, 38.9711, 38.971, 0.707107, -0.408248, 0.57735, 0, 0.816497, 0.57735, -0.707107, -0.408248, 0.57735)
@@ -607,7 +597,7 @@ do
 			instances["nativesettings"]:AddTag("UIColor2")
 			instances["nativesettings"]:AddTag("UITransparency2")
 
-			instances["UICorner25"] = Instance.new("UICorner")
+			instances["UICorner26"] = Instance.new("UICorner")
 
 			instances["add4"] = Instance.new("ImageLabel")
 			instances["add4"].Active = true
@@ -660,29 +650,29 @@ do
 			instances["ExampleMenuFrame"].Position = UDim2.new(1, 0, 0, 0)
 			instances["ExampleMenuFrame"].Size = UDim2.new(1, -106, 1, 0)
 
-			instances["ScrollingFrame6"] = Instance.new("ScrollingFrame")
-			instances["ScrollingFrame6"].Active = true
-			instances["ScrollingFrame6"].AutomaticCanvasSize = Enum.AutomaticSize.Y
-			instances["ScrollingFrame6"].BackgroundColor3 = Color3.fromRGB(248, 248, 248)
-			instances["ScrollingFrame6"].BackgroundTransparency = 1
-			instances["ScrollingFrame6"].BorderColor3 = Color3.fromRGB(17, 17, 17)
-			instances["ScrollingFrame6"].BorderSizePixel = 0
-			instances["ScrollingFrame6"].CanvasSize = UDim2.new(0, 0, 5, 0)
-			instances["ScrollingFrame6"].HorizontalScrollBarInset = Enum.ScrollBarInset.ScrollBar
-			instances["ScrollingFrame6"].ScrollBarImageColor3 = Color3.fromRGB(165, 79, 79)
-			instances["ScrollingFrame6"].ScrollBarImageTransparency = 0.5
-			instances["ScrollingFrame6"].ScrollBarThickness = 10
-			instances["ScrollingFrame6"].Size = UDim2.new(1, 0, 1, 0)
-			instances["ScrollingFrame6"].VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
-			instances["ScrollingFrame6"]:AddTag("BarColor")
-			instances["ScrollingFrame6"]:AddTag("BarTransparency")
+			instances["ScrollingFrame7"] = Instance.new("ScrollingFrame")
+			instances["ScrollingFrame7"].Active = true
+			instances["ScrollingFrame7"].AutomaticCanvasSize = Enum.AutomaticSize.Y
+			instances["ScrollingFrame7"].BackgroundColor3 = Color3.fromRGB(248, 248, 248)
+			instances["ScrollingFrame7"].BackgroundTransparency = 1
+			instances["ScrollingFrame7"].BorderColor3 = Color3.fromRGB(17, 17, 17)
+			instances["ScrollingFrame7"].BorderSizePixel = 0
+			instances["ScrollingFrame7"].CanvasSize = UDim2.new(0, 0, 5, 0)
+			instances["ScrollingFrame7"].HorizontalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+			instances["ScrollingFrame7"].ScrollBarImageColor3 = Color3.fromRGB(165, 79, 79)
+			instances["ScrollingFrame7"].ScrollBarImageTransparency = 0.5
+			instances["ScrollingFrame7"].ScrollBarThickness = 10
+			instances["ScrollingFrame7"].Size = UDim2.new(1, 0, 1, 0)
+			instances["ScrollingFrame7"].VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+			instances["ScrollingFrame7"]:AddTag("BarColor")
+			instances["ScrollingFrame7"]:AddTag("BarTransparency")
 
-			instances["UIListLayout14"] = Instance.new("UIListLayout")
-			instances["UIListLayout14"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout14"].HorizontalAlignment = Enum.HorizontalAlignment.Center
-			instances["UIListLayout14"].Padding = UDim.new(0, 6)
-			instances["UIListLayout14"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout14"].Wraps = true
+			instances["UIListLayout16"] = Instance.new("UIListLayout")
+			instances["UIListLayout16"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout16"].HorizontalAlignment = Enum.HorizontalAlignment.Center
+			instances["UIListLayout16"].Padding = UDim.new(0, 6)
+			instances["UIListLayout16"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout16"].Wraps = true
 
 			instances["ExampleModelButton"] = Instance.new("TextButton")
 			instances["ExampleModelButton"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
@@ -702,7 +692,7 @@ do
 			instances["ExampleModelButton"]:AddTag("UIColor2")
 			instances["ExampleModelButton"]:AddTag("UITransparency2")
 
-			instances["UICorner69"] = Instance.new("UICorner")
+			instances["UICorner71"] = Instance.new("UICorner")
 
 			instances["Frame7"] = Instance.new("ViewportFrame")
 			instances["Frame7"].Active = true
@@ -715,8 +705,8 @@ do
 			instances["Frame7"].Position = UDim2.new(0.5, 0, 0.5, 0)
 			instances["Frame7"].Size = UDim2.new(1, 0, 1, 0)
 
-			instances["UICorner75"] = Instance.new("UICorner")
-			instances["UICorner75"].CornerRadius = UDim.new(0, 12)
+			instances["UICorner77"] = Instance.new("UICorner")
+			instances["UICorner77"].CornerRadius = UDim.new(0, 12)
 
 			instances["Camera5"] = Instance.new("Camera")
 			instances["Camera5"].CFrame = CFrame.new(38.971, 38.9711, 38.971, 0.707107, -0.408248, 0.57735, 0, 0.816497, 0.57735, -0.707107, -0.408248, 0.57735)
@@ -724,34 +714,34 @@ do
 
 			instances["UIAspectRatioConstraint32"] = Instance.new("UIAspectRatioConstraint")
 
-			instances["TextLabel8"] = Instance.new("TextLabel")
-			instances["TextLabel8"].Active = true
-			instances["TextLabel8"].AnchorPoint = Vector2.new(0.5, 1)
-			instances["TextLabel8"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["TextLabel8"].BackgroundTransparency = 1
-			instances["TextLabel8"].BorderColor3 = Color3.fromRGB(17, 17, 17)
-			instances["TextLabel8"].BorderSizePixel = 0
-			instances["TextLabel8"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
-			instances["TextLabel8"].LayoutOrder = 3
-			instances["TextLabel8"].Position = UDim2.new(0.5, 0, 1, -3)
-			instances["TextLabel8"].Size = UDim2.new(0.9, 0, 0.35, 0)
-			instances["TextLabel8"].Text = "Block"
-			instances["TextLabel8"].TextColor3 = Color3.fromRGB(248, 248, 248)
-			instances["TextLabel8"].TextSize = 18
-			instances["TextLabel8"].TextTransparency = 0.35
-			instances["TextLabel8"].TextTruncate = Enum.TextTruncate.AtEnd
-			instances["TextLabel8"].TextYAlignment = Enum.TextYAlignment.Bottom
+			instances["TextLabel9"] = Instance.new("TextLabel")
+			instances["TextLabel9"].Active = true
+			instances["TextLabel9"].AnchorPoint = Vector2.new(0.5, 1)
+			instances["TextLabel9"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["TextLabel9"].BackgroundTransparency = 1
+			instances["TextLabel9"].BorderColor3 = Color3.fromRGB(17, 17, 17)
+			instances["TextLabel9"].BorderSizePixel = 0
+			instances["TextLabel9"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+			instances["TextLabel9"].LayoutOrder = 3
+			instances["TextLabel9"].Position = UDim2.new(0.5, 0, 1, -3)
+			instances["TextLabel9"].Size = UDim2.new(0.9, 0, 0.35, 0)
+			instances["TextLabel9"].Text = "Block"
+			instances["TextLabel9"].TextColor3 = Color3.fromRGB(248, 248, 248)
+			instances["TextLabel9"].TextSize = 18
+			instances["TextLabel9"].TextTransparency = 0.35
+			instances["TextLabel9"].TextTruncate = Enum.TextTruncate.AtEnd
+			instances["TextLabel9"].TextYAlignment = Enum.TextYAlignment.Bottom
 
-			instances["UICorner76"] = Instance.new("UICorner")
+			instances["UICorner78"] = Instance.new("UICorner")
 
 			instances["UIStroke13"] = Instance.new("UIStroke")
 			instances["UIStroke13"].Transparency = 0.35
 
-			instances["UIPadding29"] = Instance.new("UIPadding")
-			instances["UIPadding29"].PaddingBottom = UDim.new(0, 6)
-			instances["UIPadding29"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding29"].PaddingRight = UDim.new(0, 6)
-			instances["UIPadding29"].PaddingTop = UDim.new(0, 6)
+			instances["UIPadding30"] = Instance.new("UIPadding")
+			instances["UIPadding30"].PaddingBottom = UDim.new(0, 6)
+			instances["UIPadding30"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding30"].PaddingRight = UDim.new(0, 6)
+			instances["UIPadding30"].PaddingTop = UDim.new(0, 6)
 
 			instances["ScrollingFrame2"] = Instance.new("ScrollingFrame")
 			instances["ScrollingFrame2"].Active = true
@@ -769,10 +759,10 @@ do
 			instances["ScrollingFrame2"]:AddTag("BarColor")
 			instances["ScrollingFrame2"]:AddTag("BarTransparency")
 
-			instances["UIListLayout3"] = Instance.new("UIListLayout")
-			instances["UIListLayout3"].HorizontalAlignment = Enum.HorizontalAlignment.Center
-			instances["UIListLayout3"].Padding = UDim.new(0, 6)
-			instances["UIListLayout3"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout4"] = Instance.new("UIListLayout")
+			instances["UIListLayout4"].HorizontalAlignment = Enum.HorizontalAlignment.Center
+			instances["UIListLayout4"].Padding = UDim.new(0, 6)
+			instances["UIListLayout4"].SortOrder = Enum.SortOrder.LayoutOrder
 
 			instances["ExampleMenuButton"] = Instance.new("TextButton")
 			instances["ExampleMenuButton"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
@@ -792,7 +782,7 @@ do
 			instances["ExampleMenuButton"]:AddTag("UIColor2")
 			instances["ExampleMenuButton"]:AddTag("UITransparency2")
 
-			instances["UICorner26"] = Instance.new("UICorner")
+			instances["UICorner27"] = Instance.new("UICorner")
 
 			instances["Frame4"] = Instance.new("ViewportFrame")
 			instances["Frame4"].Active = true
@@ -805,8 +795,8 @@ do
 			instances["Frame4"].Position = UDim2.new(0.5, 0, 0.5, 0)
 			instances["Frame4"].Size = UDim2.new(1, 0, 1, 0)
 
-			instances["UICorner47"] = Instance.new("UICorner")
-			instances["UICorner47"].CornerRadius = UDim.new(0, 12)
+			instances["UICorner48"] = Instance.new("UICorner")
+			instances["UICorner48"].CornerRadius = UDim.new(0, 12)
 
 			instances["Camera2"] = Instance.new("Camera")
 			instances["Camera2"].CFrame = CFrame.new(38.971, 38.9711, 38.971, 0.707107, -0.408248, 0.57735, 0, 0.816497, 0.57735, -0.707107, -0.408248, 0.57735)
@@ -832,7 +822,7 @@ do
 			instances["TextLabel2"].TextTruncate = Enum.TextTruncate.AtEnd
 			instances["TextLabel2"].TextYAlignment = Enum.TextYAlignment.Bottom
 
-			instances["UICorner48"] = Instance.new("UICorner")
+			instances["UICorner49"] = Instance.new("UICorner")
 
 			instances["UIStroke4"] = Instance.new("UIStroke")
 			instances["UIStroke4"].Transparency = 0.35
@@ -879,11 +869,11 @@ do
 			instances["TextBox"].TextSize = 14
 			instances["TextBox"].TextXAlignment = Enum.TextXAlignment.Left
 
-			instances["UIPadding17"] = Instance.new("UIPadding")
-			instances["UIPadding17"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding17"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding17"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding17"].PaddingTop = UDim.new(0, 2)
+			instances["UIPadding18"] = Instance.new("UIPadding")
+			instances["UIPadding18"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding18"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding18"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding18"].PaddingTop = UDim.new(0, 2)
 
 			instances["UITextSizeConstraint"] = Instance.new("UITextSizeConstraint")
 			instances["UITextSizeConstraint"].MaxTextSize = 14
@@ -899,11 +889,11 @@ do
 			instances["ImageLabel"].Position = UDim2.new(1, 0, 0.5, 0)
 			instances["ImageLabel"].Size = UDim2.new(1, -150, 1, 0)
 
-			instances["UIPadding18"] = Instance.new("UIPadding")
-			instances["UIPadding18"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding18"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding18"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding18"].PaddingTop = UDim.new(0, 2)
+			instances["UIPadding19"] = Instance.new("UIPadding")
+			instances["UIPadding19"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding19"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding19"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding19"].PaddingTop = UDim.new(0, 2)
 
 			instances["UITextSizeConstraint2"] = Instance.new("UITextSizeConstraint")
 			instances["UITextSizeConstraint2"].MaxTextSize = 14
@@ -942,11 +932,11 @@ do
 			instances["ScrollingFrame3"]:AddTag("BarColor")
 			instances["ScrollingFrame3"]:AddTag("BarTransparency")
 
-			instances["UIListLayout4"] = Instance.new("UIListLayout")
-			instances["UIListLayout4"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout4"].Padding = UDim.new(0, 6)
-			instances["UIListLayout4"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout4"].VerticalAlignment = Enum.VerticalAlignment.Center
+			instances["UIListLayout5"] = Instance.new("UIListLayout")
+			instances["UIListLayout5"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout5"].Padding = UDim.new(0, 6)
+			instances["UIListLayout5"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout5"].VerticalAlignment = Enum.VerticalAlignment.Center
 
 			instances["UICorner9"] = Instance.new("UICorner")
 
@@ -966,7 +956,7 @@ do
 			instances["add"]:AddTag("UIColor2")
 			instances["add"]:AddTag("UITransparency2")
 
-			instances["UICorner27"] = Instance.new("UICorner")
+			instances["UICorner28"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint15"] = Instance.new("UIAspectRatioConstraint")
 
@@ -986,7 +976,7 @@ do
 			instances["copycolor"]:AddTag("UIColor2")
 			instances["copycolor"]:AddTag("UITransparency2")
 
-			instances["UICorner28"] = Instance.new("UICorner")
+			instances["UICorner29"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint16"] = Instance.new("UIAspectRatioConstraint")
 
@@ -1006,7 +996,7 @@ do
 			instances["destroy"]:AddTag("UIColor2")
 			instances["destroy"]:AddTag("UITransparency2")
 
-			instances["UICorner29"] = Instance.new("UICorner")
+			instances["UICorner30"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint17"] = Instance.new("UIAspectRatioConstraint")
 
@@ -1024,7 +1014,7 @@ do
 			instances["selection"]:AddTag("UIColor2")
 			instances["selection"]:AddTag("UITransparency2")
 
-			instances["UICorner30"] = Instance.new("UICorner")
+			instances["UICorner31"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint18"] = Instance.new("UIAspectRatioConstraint")
 
@@ -1044,7 +1034,7 @@ do
 			instances["position"]:AddTag("UIColor2")
 			instances["position"]:AddTag("UITransparency2")
 
-			instances["UICorner31"] = Instance.new("UICorner")
+			instances["UICorner32"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint19"] = Instance.new("UIAspectRatioConstraint")
 
@@ -1064,7 +1054,7 @@ do
 			instances["recolor"]:AddTag("UIColor2")
 			instances["recolor"]:AddTag("UITransparency2")
 
-			instances["UICorner32"] = Instance.new("UICorner")
+			instances["UICorner33"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint20"] = Instance.new("UIAspectRatioConstraint")
 
@@ -1084,7 +1074,7 @@ do
 			instances["resize"]:AddTag("UIColor2")
 			instances["resize"]:AddTag("UITransparency2")
 
-			instances["UICorner33"] = Instance.new("UICorner")
+			instances["UICorner34"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint21"] = Instance.new("UIAspectRatioConstraint")
 
@@ -1104,7 +1094,7 @@ do
 			instances["rote"]:AddTag("UIColor2")
 			instances["rote"]:AddTag("UITransparency2")
 
-			instances["UICorner34"] = Instance.new("UICorner")
+			instances["UICorner35"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint22"] = Instance.new("UIAspectRatioConstraint")
 
@@ -1124,7 +1114,7 @@ do
 			instances["none"]:AddTag("UIColor2")
 			instances["none"]:AddTag("UITransparency2")
 
-			instances["UICorner35"] = Instance.new("UICorner")
+			instances["UICorner36"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint23"] = Instance.new("UIAspectRatioConstraint")
 
@@ -1171,12 +1161,12 @@ do
 			instances["ScrollingFrame4"]:AddTag("BarColor")
 			instances["ScrollingFrame4"]:AddTag("BarTransparency")
 
-			instances["UIListLayout5"] = Instance.new("UIListLayout")
-			instances["UIListLayout5"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout5"].HorizontalAlignment = Enum.HorizontalAlignment.Center
-			instances["UIListLayout5"].Padding = UDim.new(0, 6)
-			instances["UIListLayout5"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout5"].Wraps = true
+			instances["UIListLayout6"] = Instance.new("UIListLayout")
+			instances["UIListLayout6"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout6"].HorizontalAlignment = Enum.HorizontalAlignment.Center
+			instances["UIListLayout6"].Padding = UDim.new(0, 6)
+			instances["UIListLayout6"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout6"].Wraps = true
 
 			instances["ExampleMaterialButton"] = Instance.new("TextButton")
 			instances["ExampleMaterialButton"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
@@ -1196,7 +1186,7 @@ do
 			instances["ExampleMaterialButton"]:AddTag("UIColor2")
 			instances["ExampleMaterialButton"]:AddTag("UITransparency2")
 
-			instances["UICorner36"] = Instance.new("UICorner")
+			instances["UICorner37"] = Instance.new("UICorner")
 
 			instances["Frame5"] = Instance.new("ViewportFrame")
 			instances["Frame5"].Active = true
@@ -1209,8 +1199,8 @@ do
 			instances["Frame5"].Position = UDim2.new(0.5, 0, 0.5, 0)
 			instances["Frame5"].Size = UDim2.new(1, 0, 1, 0)
 
-			instances["UICorner49"] = Instance.new("UICorner")
-			instances["UICorner49"].CornerRadius = UDim.new(0, 12)
+			instances["UICorner50"] = Instance.new("UICorner")
+			instances["UICorner50"].CornerRadius = UDim.new(0, 12)
 
 			instances["Camera3"] = Instance.new("Camera")
 			instances["Camera3"].CFrame = CFrame.new(38.971, 38.9711, 38.971, 0.707107, -0.408248, 0.57735, 0, 0.816497, 0.57735, -0.707107, -0.408248, 0.57735)
@@ -1246,7 +1236,7 @@ do
 			instances["TextLabel3"].TextTruncate = Enum.TextTruncate.AtEnd
 			instances["TextLabel3"].TextYAlignment = Enum.TextYAlignment.Bottom
 
-			instances["UICorner50"] = Instance.new("UICorner")
+			instances["UICorner51"] = Instance.new("UICorner")
 
 			instances["UIStroke5"] = Instance.new("UIStroke")
 			instances["UIStroke5"].Transparency = 0.35
@@ -1287,11 +1277,11 @@ do
 			instances["TextBox2"].TextSize = 14
 			instances["TextBox2"].TextXAlignment = Enum.TextXAlignment.Left
 
-			instances["UIPadding19"] = Instance.new("UIPadding")
-			instances["UIPadding19"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding19"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding19"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding19"].PaddingTop = UDim.new(0, 2)
+			instances["UIPadding20"] = Instance.new("UIPadding")
+			instances["UIPadding20"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding20"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding20"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding20"].PaddingTop = UDim.new(0, 2)
 
 			instances["UITextSizeConstraint3"] = Instance.new("UITextSizeConstraint")
 			instances["UITextSizeConstraint3"].MaxTextSize = 14
@@ -1307,11 +1297,11 @@ do
 			instances["ImageLabel2"].Position = UDim2.new(1, 0, 0.5, 0)
 			instances["ImageLabel2"].Size = UDim2.new(1, -150, 1, 0)
 
-			instances["UIPadding20"] = Instance.new("UIPadding")
-			instances["UIPadding20"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding20"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding20"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding20"].PaddingTop = UDim.new(0, 2)
+			instances["UIPadding21"] = Instance.new("UIPadding")
+			instances["UIPadding21"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding21"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding21"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding21"].PaddingTop = UDim.new(0, 2)
 
 			instances["UITextSizeConstraint4"] = Instance.new("UITextSizeConstraint")
 			instances["UITextSizeConstraint4"].MaxTextSize = 14
@@ -1355,12 +1345,12 @@ do
 			instances["ScrollingFrame5"]:AddTag("BarColor")
 			instances["ScrollingFrame5"]:AddTag("BarTransparency")
 
-			instances["UIListLayout6"] = Instance.new("UIListLayout")
-			instances["UIListLayout6"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout6"].HorizontalAlignment = Enum.HorizontalAlignment.Center
-			instances["UIListLayout6"].Padding = UDim.new(0, 6)
-			instances["UIListLayout6"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout6"].Wraps = true
+			instances["UIListLayout7"] = Instance.new("UIListLayout")
+			instances["UIListLayout7"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout7"].HorizontalAlignment = Enum.HorizontalAlignment.Center
+			instances["UIListLayout7"].Padding = UDim.new(0, 6)
+			instances["UIListLayout7"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout7"].Wraps = true
 
 			instances["ExampleMaterialButton2"] = Instance.new("TextButton")
 			instances["ExampleMaterialButton2"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
@@ -1380,7 +1370,7 @@ do
 			instances["ExampleMaterialButton2"]:AddTag("UIColor2")
 			instances["ExampleMaterialButton2"]:AddTag("UITransparency2")
 
-			instances["UICorner37"] = Instance.new("UICorner")
+			instances["UICorner38"] = Instance.new("UICorner")
 
 			instances["Frame6"] = Instance.new("ViewportFrame")
 			instances["Frame6"].Active = true
@@ -1393,8 +1383,8 @@ do
 			instances["Frame6"].Position = UDim2.new(0.5, 0, 0.5, 0)
 			instances["Frame6"].Size = UDim2.new(1, 0, 1, 0)
 
-			instances["UICorner51"] = Instance.new("UICorner")
-			instances["UICorner51"].CornerRadius = UDim.new(0, 12)
+			instances["UICorner52"] = Instance.new("UICorner")
+			instances["UICorner52"].CornerRadius = UDim.new(0, 12)
 
 			instances["Camera4"] = Instance.new("Camera")
 			instances["Camera4"].CFrame = CFrame.new(38.971, 38.9711, 38.971, 0.707107, -0.408248, 0.57735, 0, 0.816497, 0.57735, -0.707107, -0.408248, 0.57735)
@@ -1430,7 +1420,7 @@ do
 			instances["TextLabel4"].TextTruncate = Enum.TextTruncate.AtEnd
 			instances["TextLabel4"].TextYAlignment = Enum.TextYAlignment.Bottom
 
-			instances["UICorner52"] = Instance.new("UICorner")
+			instances["UICorner53"] = Instance.new("UICorner")
 
 			instances["UIStroke6"] = Instance.new("UIStroke")
 			instances["UIStroke6"].Transparency = 0.35
@@ -1493,11 +1483,11 @@ do
 			instances["TextBox3"].TextSize = 14
 			instances["TextBox3"].TextXAlignment = Enum.TextXAlignment.Left
 
-			instances["UIPadding21"] = Instance.new("UIPadding")
-			instances["UIPadding21"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding21"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding21"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding21"].PaddingTop = UDim.new(0, 2)
+			instances["UIPadding22"] = Instance.new("UIPadding")
+			instances["UIPadding22"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding22"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding22"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding22"].PaddingTop = UDim.new(0, 2)
 
 			instances["UITextSizeConstraint5"] = Instance.new("UITextSizeConstraint")
 			instances["UITextSizeConstraint5"].MaxTextSize = 14
@@ -1513,11 +1503,11 @@ do
 			instances["ImageLabel3"].Position = UDim2.new(1, 0, 0.5, 0)
 			instances["ImageLabel3"].Size = UDim2.new(1, -150, 1, 0)
 
-			instances["UIPadding22"] = Instance.new("UIPadding")
-			instances["UIPadding22"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding22"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding22"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding22"].PaddingTop = UDim.new(0, 2)
+			instances["UIPadding23"] = Instance.new("UIPadding")
+			instances["UIPadding23"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding23"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding23"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding23"].PaddingTop = UDim.new(0, 2)
 
 			instances["UITextSizeConstraint6"] = Instance.new("UITextSizeConstraint")
 			instances["UITextSizeConstraint6"].MaxTextSize = 14
@@ -1557,9 +1547,9 @@ do
 			instances["Tabs"]:AddTag("BarColor")
 			instances["Tabs"]:AddTag("BarTransparency")
 
-			instances["UIListLayout7"] = Instance.new("UIListLayout")
-			instances["UIListLayout7"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout7"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout8"] = Instance.new("UIListLayout")
+			instances["UIListLayout8"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout8"].SortOrder = Enum.SortOrder.LayoutOrder
 
 			instances["ExampleTab"] = Instance.new("TextButton")
 			instances["ExampleTab"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
@@ -1577,10 +1567,10 @@ do
 			instances["ExampleTab"]:AddTag("UIColor2")
 			instances["ExampleTab"]:AddTag("UITransparency2")
 
-			instances["UIPadding23"] = Instance.new("UIPadding")
-			instances["UIPadding23"].PaddingTop = UDim.new(0, 5)
+			instances["UIPadding24"] = Instance.new("UIPadding")
+			instances["UIPadding24"].PaddingTop = UDim.new(0, 5)
 
-			instances["UICorner38"] = Instance.new("UICorner")
+			instances["UICorner39"] = Instance.new("UICorner")
 
 			instances["SettingsPages"] = Instance.new("Frame")
 			instances["SettingsPages"].Active = true
@@ -1617,70 +1607,305 @@ do
 			instances["UIGradient"].Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(229, 229, 229))})
 			instances["UIGradient"].Rotation = 95
 
-			instances["UIListLayout11"] = Instance.new("UIListLayout")
-			instances["UIListLayout11"].Padding = UDim.new(0, 4)
-			instances["UIListLayout11"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout12"] = Instance.new("UIListLayout")
+			instances["UIListLayout12"].Padding = UDim.new(0, 4)
+			instances["UIListLayout12"].SortOrder = Enum.SortOrder.LayoutOrder
 
-			instances["UIPadding24"] = Instance.new("UIPadding")
-			instances["UIPadding24"].PaddingBottom = UDim.new(0, 5)
-			instances["UIPadding24"].PaddingLeft = UDim.new(0, 5)
-			instances["UIPadding24"].PaddingRight = UDim.new(0, 5)
-			instances["UIPadding24"].PaddingTop = UDim.new(0, 5)
+			instances["UIPadding25"] = Instance.new("UIPadding")
+			instances["UIPadding25"].PaddingBottom = UDim.new(0, 5)
+			instances["UIPadding25"].PaddingLeft = UDim.new(0, 5)
+			instances["UIPadding25"].PaddingRight = UDim.new(0, 5)
+			instances["UIPadding25"].PaddingTop = UDim.new(0, 5)
 
-			instances["TextExample"] = Instance.new("Frame")
-			instances["TextExample"].Active = true
-			instances["TextExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["TextExample"].BackgroundTransparency = 0.8
-			instances["TextExample"].LayoutOrder = 8
-			instances["TextExample"].Name = "TextExample"
-			instances["TextExample"].Position = UDim2.new(0, 5, 0, 5)
-			instances["TextExample"].Size = UDim2.new(1, 0, 0, 42)
-			instances["TextExample"].ZIndex = 4
-			instances["TextExample"]:AddTag("GuiConstructor")
-			instances["TextExample"]:AddTag("UIColor2")
-			instances["TextExample"]:AddTag("UITransparency2")
-
-			instances["UICorner53"] = Instance.new("UICorner")
+			instances["Vector3Example"] = Instance.new("Frame")
+			instances["Vector3Example"].Active = true
+			instances["Vector3Example"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["Vector3Example"].BackgroundTransparency = 0.8
+			instances["Vector3Example"].LayoutOrder = 1
+			instances["Vector3Example"].Name = "Vector3Example"
+			instances["Vector3Example"].Size = UDim2.new(1, 0, 0, 42)
+			instances["Vector3Example"].Visible = false
+			instances["Vector3Example"].ZIndex = 1e+07
+			instances["Vector3Example"]:AddTag("UIColor2")
+			instances["Vector3Example"]:AddTag("UITransparency2")
 
 			instances["Label2"] = Instance.new("TextLabel")
 			instances["Label2"].Active = true
 			instances["Label2"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["Label2"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["Label2"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 			instances["Label2"].BackgroundTransparency = 1
 			instances["Label2"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
 			instances["Label2"].Name = "Label"
 			instances["Label2"].Position = UDim2.new(0, 0, 0.5, 0)
 			instances["Label2"].RichText = true
-			instances["Label2"].Size = UDim2.new(1, 0, 0, 32)
+			instances["Label2"].Size = UDim2.new(1, -191, 0, 32)
 			instances["Label2"].Text = "ExampleText"
 			instances["Label2"].TextColor3 = Color3.fromRGB(47, 40, 44)
 			instances["Label2"].TextSize = 15
 			instances["Label2"].TextWrapped = true
-			instances["Label2"].ZIndex = 5
+			instances["Label2"].TextXAlignment = Enum.TextXAlignment.Left
+			instances["Label2"].ZIndex = 1e+07
 
-			instances["UIPadding39"] = Instance.new("UIPadding")
-			instances["UIPadding39"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding39"].PaddingLeft = UDim.new(0, 2)
-			instances["UIPadding39"].PaddingTop = UDim.new(0, 2)
-
-			instances["UICorner70"] = Instance.new("UICorner")
+			instances["UIPadding41"] = Instance.new("UIPadding")
+			instances["UIPadding41"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding41"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding41"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding41"].PaddingTop = UDim.new(0, 2)
 
 			instances["UITextSizeConstraint8"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint8"].MaxTextSize = 18
+			instances["UITextSizeConstraint8"].MaxTextSize = 14
 
-			instances["UIPadding30"] = Instance.new("UIPadding")
-			instances["UIPadding30"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding30"].PaddingRight = UDim.new(0, 6)
+			instances["UICorner54"] = Instance.new("UICorner")
+
+			instances["Folder"] = Instance.new("Folder")
+
+			instances["UIListLayout18"] = Instance.new("UIListLayout")
+			instances["UIListLayout18"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout18"].HorizontalAlignment = Enum.HorizontalAlignment.Right
+			instances["UIListLayout18"].Padding = UDim.new(0, 10)
+			instances["UIListLayout18"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout18"].VerticalAlignment = Enum.VerticalAlignment.Center
+
+			instances["X"] = Instance.new("TextBox")
+			instances["X"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["X"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["X"].BackgroundTransparency = 0.8
+			instances["X"].ClearTextOnFocus = false
+			instances["X"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["X"].Name = "X"
+			instances["X"].PlaceholderColor3 = Color3.fromRGB(72, 61, 68)
+			instances["X"].PlaceholderText = "X"
+			instances["X"].Position = UDim2.new(0, 110, 0.5, 0)
+			instances["X"].RichText = true
+			instances["X"].Size = UDim2.new(0, 40, 0, 32)
+			instances["X"].Text = "0"
+			instances["X"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["X"].TextSize = 14
+			instances["X"].TextWrapped = true
+			instances["X"].ZIndex = 1e+07
+			instances["X"]:AddTag("UIColor2")
+			instances["X"]:AddTag("UITransparency2")
+
+			instances["UITextSizeConstraint17"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint17"].MaxTextSize = 14
+
+			instances["UICorner79"] = Instance.new("UICorner")
+			instances["UICorner79"].CornerRadius = UDim.new(0, 4)
+
+			instances["UIAspectRatioConstraint35"] = Instance.new("UIAspectRatioConstraint")
+
+			instances["Y"] = Instance.new("TextBox")
+			instances["Y"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["Y"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["Y"].BackgroundTransparency = 0.8
+			instances["Y"].ClearTextOnFocus = false
+			instances["Y"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["Y"].LayoutOrder = 1
+			instances["Y"].Name = "Y"
+			instances["Y"].PlaceholderColor3 = Color3.fromRGB(72, 61, 68)
+			instances["Y"].PlaceholderText = "Y"
+			instances["Y"].Position = UDim2.new(0, 110, 0.5, 0)
+			instances["Y"].RichText = true
+			instances["Y"].Size = UDim2.new(0, 40, 0, 32)
+			instances["Y"].Text = "0"
+			instances["Y"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Y"].TextSize = 14
+			instances["Y"].TextWrapped = true
+			instances["Y"].ZIndex = 1e+07
+			instances["Y"]:AddTag("UIColor2")
+			instances["Y"]:AddTag("UITransparency2")
+
+			instances["UITextSizeConstraint18"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint18"].MaxTextSize = 14
+
+			instances["UICorner80"] = Instance.new("UICorner")
+			instances["UICorner80"].CornerRadius = UDim.new(0, 4)
+
+			instances["UIAspectRatioConstraint36"] = Instance.new("UIAspectRatioConstraint")
+
+			instances["Z"] = Instance.new("TextBox")
+			instances["Z"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["Z"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["Z"].BackgroundTransparency = 0.8
+			instances["Z"].ClearTextOnFocus = false
+			instances["Z"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["Z"].LayoutOrder = 2
+			instances["Z"].Name = "Z"
+			instances["Z"].PlaceholderColor3 = Color3.fromRGB(72, 61, 68)
+			instances["Z"].PlaceholderText = "Z"
+			instances["Z"].Position = UDim2.new(0, 110, 0.5, 0)
+			instances["Z"].RichText = true
+			instances["Z"].Size = UDim2.new(0, 40, 0, 32)
+			instances["Z"].Text = "0"
+			instances["Z"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Z"].TextSize = 14
+			instances["Z"].TextWrapped = true
+			instances["Z"].ZIndex = 1e+07
+			instances["Z"]:AddTag("UIColor2")
+			instances["Z"]:AddTag("UITransparency2")
+
+			instances["UITextSizeConstraint19"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint19"].MaxTextSize = 14
+
+			instances["UICorner81"] = Instance.new("UICorner")
+			instances["UICorner81"].CornerRadius = UDim.new(0, 4)
+
+			instances["UIAspectRatioConstraint37"] = Instance.new("UIAspectRatioConstraint")
+
+			instances["UIPadding31"] = Instance.new("UIPadding")
+			instances["UIPadding31"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding31"].PaddingRight = UDim.new(0, 6)
+
+			instances["BooleanExample"] = Instance.new("Frame")
+			instances["BooleanExample"].Active = true
+			instances["BooleanExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["BooleanExample"].BackgroundTransparency = 0.8
+			instances["BooleanExample"].LayoutOrder = 1
+			instances["BooleanExample"].Name = "BooleanExample"
+			instances["BooleanExample"].Size = UDim2.new(1, 0, 0, 42)
+			instances["BooleanExample"].Visible = false
+			instances["BooleanExample"].ZIndex = 1e+07
+			instances["BooleanExample"]:AddTag("UIColor2")
+			instances["BooleanExample"]:AddTag("UITransparency2")
+
+			instances["Label3"] = Instance.new("TextLabel")
+			instances["Label3"].Active = true
+			instances["Label3"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["Label3"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["Label3"].BackgroundTransparency = 1
+			instances["Label3"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["Label3"].Name = "Label"
+			instances["Label3"].Position = UDim2.new(0, 0, 0.5, 0)
+			instances["Label3"].RichText = true
+			instances["Label3"].Size = UDim2.new(1, -191, 0, 32)
+			instances["Label3"].Text = "ExampleText"
+			instances["Label3"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Label3"].TextSize = 15
+			instances["Label3"].TextWrapped = true
+			instances["Label3"].TextXAlignment = Enum.TextXAlignment.Left
+			instances["Label3"].ZIndex = 1e+07
+
+			instances["UITextSizeConstraint9"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint9"].MaxTextSize = 14
+
+			instances["UIPadding42"] = Instance.new("UIPadding")
+			instances["UIPadding42"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding42"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding42"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding42"].PaddingTop = UDim.new(0, 2)
+
+			instances["UICorner55"] = Instance.new("UICorner")
+
+			instances["Folder2"] = Instance.new("Folder")
+
+			instances["Off"] = Instance.new("ImageButton")
+			instances["Off"].AnchorPoint = Vector2.new(0.5, 0.5)
+			instances["Off"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["Off"].BackgroundTransparency = 0.8
+			instances["Off"].HoverImage = "rbxassetid://5275290705"
+			instances["Off"].Image = "rbxassetid://5275291385"
+			instances["Off"].ImageColor3 = Color3.fromRGB(197, 89, 89)
+			instances["Off"].ImageTransparency = 1
+			instances["Off"].Name = "Off"
+			instances["Off"].Position = UDim2.new(0.975385, -45, 0.5, 0)
+			instances["Off"].PressedImage = "rbxassetid://5275290141"
+			instances["Off"].ScaleType = Enum.ScaleType.Slice
+			instances["Off"].Size = UDim2.new(0, 45, 0, 32)
+			instances["Off"].SliceCenter = Rect.new(6, 6, 30, 30)
+			instances["Off"].ZIndex = 1e+07
+			instances["Off"]:AddTag("UIColor2")
+
+			instances["Value"] = Instance.new("TextLabel")
+			instances["Value"].Active = true
+			instances["Value"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["Value"].BackgroundTransparency = 1
+			instances["Value"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["Value"].Name = "Value"
+			instances["Value"].Size = UDim2.new(1, 0, 1, 0)
+			instances["Value"].Text = "Off"
+			instances["Value"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Value"].TextScaled = true
+			instances["Value"].TextSize = 12
+			instances["Value"].TextWrapped = true
+			instances["Value"].ZIndex = 1e+07
+
+			instances["UITextSizeConstraint25"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint25"].MaxTextSize = 14
+
+			instances["UIPadding51"] = Instance.new("UIPadding")
+			instances["UIPadding51"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding51"].PaddingLeft = UDim.new(0, 4)
+			instances["UIPadding51"].PaddingRight = UDim.new(0, 4)
+			instances["UIPadding51"].PaddingTop = UDim.new(0, 2)
+
+			instances["UICorner82"] = Instance.new("UICorner")
+			instances["UICorner82"].CornerRadius = UDim.new(0, 4)
+
+			instances["On"] = Instance.new("ImageButton")
+			instances["On"].AnchorPoint = Vector2.new(0.5, 0.5)
+			instances["On"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["On"].BackgroundTransparency = 0.8
+			instances["On"].HoverImage = "rbxassetid://5275288838"
+			instances["On"].Image = "rbxassetid://5275289471"
+			instances["On"].ImageColor3 = Color3.fromRGB(255, 99, 99)
+			instances["On"].ImageTransparency = 1
+			instances["On"].LayoutOrder = 1
+			instances["On"].Name = "On"
+			instances["On"].Position = UDim2.new(1, -5, 0.5, 0)
+			instances["On"].PressedImage = "rbxassetid://5275288308"
+			instances["On"].ScaleType = Enum.ScaleType.Slice
+			instances["On"].Size = UDim2.new(0, 45, 0, 32)
+			instances["On"].SliceCenter = Rect.new(6, 6, 30, 30)
+			instances["On"].ZIndex = 1e+07
+			instances["On"]:AddTag("UIColor2")
+
+			instances["Value2"] = Instance.new("TextLabel")
+			instances["Value2"].Active = true
+			instances["Value2"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["Value2"].BackgroundTransparency = 1
+			instances["Value2"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["Value2"].Name = "Value"
+			instances["Value2"].Size = UDim2.new(1, 0, 1, 0)
+			instances["Value2"].Text = "On"
+			instances["Value2"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Value2"].TextScaled = true
+			instances["Value2"].TextSize = 12
+			instances["Value2"].TextWrapped = true
+			instances["Value2"].ZIndex = 1e+07
+
+			instances["UIPadding52"] = Instance.new("UIPadding")
+			instances["UIPadding52"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding52"].PaddingLeft = UDim.new(0, 4)
+			instances["UIPadding52"].PaddingRight = UDim.new(0, 4)
+			instances["UIPadding52"].PaddingTop = UDim.new(0, 2)
+
+			instances["UITextSizeConstraint26"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint26"].MaxTextSize = 14
+
+			instances["UICorner83"] = Instance.new("UICorner")
+			instances["UICorner83"].CornerRadius = UDim.new(0, 4)
+
+			instances["UIListLayout19"] = Instance.new("UIListLayout")
+			instances["UIListLayout19"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout19"].HorizontalAlignment = Enum.HorizontalAlignment.Right
+			instances["UIListLayout19"].Padding = UDim.new(0, 10)
+			instances["UIListLayout19"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout19"].VerticalAlignment = Enum.VerticalAlignment.Center
+
+			instances["UIPadding32"] = Instance.new("UIPadding")
+			instances["UIPadding32"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding32"].PaddingRight = UDim.new(0, 6)
 
 			instances["SeparatorExample"] = Instance.new("Frame")
 			instances["SeparatorExample"].Active = true
 			instances["SeparatorExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
 			instances["SeparatorExample"].BackgroundTransparency = 1
-			instances["SeparatorExample"].LayoutOrder = 8
+			instances["SeparatorExample"].LayoutOrder = 1
 			instances["SeparatorExample"].Name = "SeparatorExample"
 			instances["SeparatorExample"].Position = UDim2.new(0, 5, 0, 5)
 			instances["SeparatorExample"].Size = UDim2.new(1, 0, 0, 52)
-			instances["SeparatorExample"].ZIndex = 4
+			instances["SeparatorExample"].Visible = false
+			instances["SeparatorExample"].ZIndex = 1e+07
 			instances["SeparatorExample"]:AddTag("GuiConstructor")
 
 			instances["VisibleUI"] = Instance.new("Frame")
@@ -1692,7 +1917,7 @@ do
 			instances["VisibleUI"].Name = "VisibleUI"
 			instances["VisibleUI"].Position = UDim2.new(0.5, 0, 1, 0)
 			instances["VisibleUI"].Size = UDim2.new(1, 0, 0, 42)
-			instances["VisibleUI"].ZIndex = 5
+			instances["VisibleUI"].ZIndex = 1e+07
 			instances["VisibleUI"]:AddTag("UIColor2")
 			instances["VisibleUI"]:AddTag("UITransparency2")
 
@@ -1710,173 +1935,35 @@ do
 			instances["Label10"].TextColor3 = Color3.fromRGB(47, 40, 44)
 			instances["Label10"].TextSize = 15
 			instances["Label10"].TextWrapped = true
-			instances["Label10"].ZIndex = 6
-
-			instances["UIPadding48"] = Instance.new("UIPadding")
-			instances["UIPadding48"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding48"].PaddingLeft = UDim.new(0, 2)
-			instances["UIPadding48"].PaddingTop = UDim.new(0, 2)
-
-			instances["UICorner77"] = Instance.new("UICorner")
-
-			instances["UITextSizeConstraint16"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint16"].MaxTextSize = 18
-
-			instances["UICorner71"] = Instance.new("UICorner")
-
-			instances["UIPadding40"] = Instance.new("UIPadding")
-			instances["UIPadding40"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding40"].PaddingRight = UDim.new(0, 6)
-
-			instances["BooleanExample"] = Instance.new("Frame")
-			instances["BooleanExample"].Active = true
-			instances["BooleanExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["BooleanExample"].BackgroundTransparency = 0.8
-			instances["BooleanExample"].LayoutOrder = 1
-			instances["BooleanExample"].Name = "BooleanExample"
-			instances["BooleanExample"].Size = UDim2.new(1, 0, 0, 42)
-			instances["BooleanExample"].ZIndex = 4
-			instances["BooleanExample"]:AddTag("UIColor2")
-			instances["BooleanExample"]:AddTag("UITransparency2")
-
-			instances["Label3"] = Instance.new("TextLabel")
-			instances["Label3"].Active = true
-			instances["Label3"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["Label3"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			instances["Label3"].BackgroundTransparency = 1
-			instances["Label3"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["Label3"].Name = "Label"
-			instances["Label3"].Position = UDim2.new(0, 0, 0.5, 0)
-			instances["Label3"].RichText = true
-			instances["Label3"].Size = UDim2.new(0, 100, 0, 32)
-			instances["Label3"].Text = "ExampleText"
-			instances["Label3"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Label3"].TextSize = 15
-			instances["Label3"].TextWrapped = true
-			instances["Label3"].TextXAlignment = Enum.TextXAlignment.Left
-			instances["Label3"].ZIndex = 5
-
-			instances["UITextSizeConstraint9"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint9"].MaxTextSize = 14
-
-			instances["UIPadding41"] = Instance.new("UIPadding")
-			instances["UIPadding41"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding41"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding41"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding41"].PaddingTop = UDim.new(0, 2)
-
-			instances["UICorner54"] = Instance.new("UICorner")
-
-			instances["Folder"] = Instance.new("Folder")
-
-			instances["Off"] = Instance.new("ImageButton")
-			instances["Off"].AnchorPoint = Vector2.new(0.5, 0.5)
-			instances["Off"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["Off"].BackgroundTransparency = 0.8
-			instances["Off"].HoverImage = "rbxassetid://5275290705"
-			instances["Off"].Image = "rbxassetid://5275291385"
-			instances["Off"].ImageColor3 = Color3.fromRGB(197, 89, 89)
-			instances["Off"].ImageTransparency = 1
-			instances["Off"].Name = "Off"
-			instances["Off"].Position = UDim2.new(0.975385, -45, 0.5, 0)
-			instances["Off"].PressedImage = "rbxassetid://5275290141"
-			instances["Off"].ScaleType = Enum.ScaleType.Slice
-			instances["Off"].Size = UDim2.new(0, 45, 0, 32)
-			instances["Off"].SliceCenter = Rect.new(6, 6, 30, 30)
-			instances["Off"].ZIndex = 6
-			instances["Off"]:AddTag("UIColor2")
-
-			instances["Value"] = Instance.new("TextLabel")
-			instances["Value"].Active = true
-			instances["Value"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			instances["Value"].BackgroundTransparency = 1
-			instances["Value"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["Value"].Name = "Value"
-			instances["Value"].Size = UDim2.new(1, 0, 1, 0)
-			instances["Value"].Text = "Off"
-			instances["Value"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Value"].TextScaled = true
-			instances["Value"].TextSize = 12
-			instances["Value"].TextWrapped = true
-			instances["Value"].ZIndex = 7
-
-			instances["UITextSizeConstraint24"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint24"].MaxTextSize = 14
-
-			instances["UIPadding49"] = Instance.new("UIPadding")
-			instances["UIPadding49"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding49"].PaddingLeft = UDim.new(0, 4)
-			instances["UIPadding49"].PaddingRight = UDim.new(0, 4)
-			instances["UIPadding49"].PaddingTop = UDim.new(0, 2)
-
-			instances["UICorner78"] = Instance.new("UICorner")
-			instances["UICorner78"].CornerRadius = UDim.new(0, 4)
-
-			instances["On"] = Instance.new("ImageButton")
-			instances["On"].AnchorPoint = Vector2.new(0.5, 0.5)
-			instances["On"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["On"].BackgroundTransparency = 0.8
-			instances["On"].HoverImage = "rbxassetid://5275288838"
-			instances["On"].Image = "rbxassetid://5275289471"
-			instances["On"].ImageColor3 = Color3.fromRGB(255, 99, 99)
-			instances["On"].ImageTransparency = 1
-			instances["On"].LayoutOrder = 1
-			instances["On"].Name = "On"
-			instances["On"].Position = UDim2.new(1, -5, 0.5, 0)
-			instances["On"].PressedImage = "rbxassetid://5275288308"
-			instances["On"].ScaleType = Enum.ScaleType.Slice
-			instances["On"].Size = UDim2.new(0, 45, 0, 32)
-			instances["On"].SliceCenter = Rect.new(6, 6, 30, 30)
-			instances["On"].ZIndex = 6
-			instances["On"]:AddTag("UIColor2")
-
-			instances["Value2"] = Instance.new("TextLabel")
-			instances["Value2"].Active = true
-			instances["Value2"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			instances["Value2"].BackgroundTransparency = 1
-			instances["Value2"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["Value2"].Name = "Value"
-			instances["Value2"].Size = UDim2.new(1, 0, 1, 0)
-			instances["Value2"].Text = "On"
-			instances["Value2"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Value2"].TextScaled = true
-			instances["Value2"].TextSize = 12
-			instances["Value2"].TextWrapped = true
-			instances["Value2"].ZIndex = 7
+			instances["Label10"].ZIndex = 1e+07
 
 			instances["UIPadding50"] = Instance.new("UIPadding")
 			instances["UIPadding50"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding50"].PaddingLeft = UDim.new(0, 4)
-			instances["UIPadding50"].PaddingRight = UDim.new(0, 4)
+			instances["UIPadding50"].PaddingLeft = UDim.new(0, 2)
 			instances["UIPadding50"].PaddingTop = UDim.new(0, 2)
 
-			instances["UITextSizeConstraint25"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint25"].MaxTextSize = 14
+			instances["UICorner84"] = Instance.new("UICorner")
 
-			instances["UICorner79"] = Instance.new("UICorner")
-			instances["UICorner79"].CornerRadius = UDim.new(0, 4)
+			instances["UITextSizeConstraint20"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint20"].MaxTextSize = 18
 
-			instances["UIListLayout16"] = Instance.new("UIListLayout")
-			instances["UIListLayout16"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout16"].HorizontalAlignment = Enum.HorizontalAlignment.Right
-			instances["UIListLayout16"].Padding = UDim.new(0, 10)
-			instances["UIListLayout16"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout16"].VerticalAlignment = Enum.VerticalAlignment.Center
+			instances["UICorner72"] = Instance.new("UICorner")
 
-			instances["UIPadding31"] = Instance.new("UIPadding")
-			instances["UIPadding31"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding31"].PaddingRight = UDim.new(0, 6)
+			instances["UIPadding43"] = Instance.new("UIPadding")
+			instances["UIPadding43"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding43"].PaddingRight = UDim.new(0, 6)
 
-			instances["Vector3Example"] = Instance.new("Frame")
-			instances["Vector3Example"].Active = true
-			instances["Vector3Example"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["Vector3Example"].BackgroundTransparency = 0.8
-			instances["Vector3Example"].LayoutOrder = 1
-			instances["Vector3Example"].Name = "Vector3Example"
-			instances["Vector3Example"].Size = UDim2.new(1, 0, 0, 42)
-			instances["Vector3Example"].ZIndex = 4
-			instances["Vector3Example"]:AddTag("UIColor2")
-			instances["Vector3Example"]:AddTag("UITransparency2")
+			instances["TextBoxExample"] = Instance.new("Frame")
+			instances["TextBoxExample"].Active = true
+			instances["TextBoxExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["TextBoxExample"].BackgroundTransparency = 0.8
+			instances["TextBoxExample"].LayoutOrder = 1
+			instances["TextBoxExample"].Name = "TextBoxExample"
+			instances["TextBoxExample"].Size = UDim2.new(1, 0, 0, 42)
+			instances["TextBoxExample"].Visible = false
+			instances["TextBoxExample"].ZIndex = 1e+07
+			instances["TextBoxExample"]:AddTag("UIColor2")
+			instances["TextBoxExample"]:AddTag("UITransparency2")
 
 			instances["Label4"] = Instance.new("TextLabel")
 			instances["Label4"].Active = true
@@ -1887,137 +1974,65 @@ do
 			instances["Label4"].Name = "Label"
 			instances["Label4"].Position = UDim2.new(0, 0, 0.5, 0)
 			instances["Label4"].RichText = true
-			instances["Label4"].Size = UDim2.new(0, 100, 0, 32)
+			instances["Label4"].Size = UDim2.new(1, -191, 0, 32)
 			instances["Label4"].Text = "ExampleText"
 			instances["Label4"].TextColor3 = Color3.fromRGB(47, 40, 44)
 			instances["Label4"].TextSize = 15
 			instances["Label4"].TextWrapped = true
 			instances["Label4"].TextXAlignment = Enum.TextXAlignment.Left
-			instances["Label4"].ZIndex = 5
-
-			instances["UIPadding42"] = Instance.new("UIPadding")
-			instances["UIPadding42"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding42"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding42"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding42"].PaddingTop = UDim.new(0, 2)
+			instances["Label4"].ZIndex = 1e+07
 
 			instances["UITextSizeConstraint10"] = Instance.new("UITextSizeConstraint")
 			instances["UITextSizeConstraint10"].MaxTextSize = 14
 
-			instances["UICorner55"] = Instance.new("UICorner")
+			instances["UIPadding44"] = Instance.new("UIPadding")
+			instances["UIPadding44"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding44"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding44"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding44"].PaddingTop = UDim.new(0, 2)
 
-			instances["Folder2"] = Instance.new("Folder")
+			instances["UICorner56"] = Instance.new("UICorner")
 
-			instances["UIListLayout17"] = Instance.new("UIListLayout")
-			instances["UIListLayout17"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout17"].HorizontalAlignment = Enum.HorizontalAlignment.Right
-			instances["UIListLayout17"].Padding = UDim.new(0, 10)
-			instances["UIListLayout17"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout17"].VerticalAlignment = Enum.VerticalAlignment.Center
+			instances["Folder3"] = Instance.new("Folder")
 
-			instances["X"] = Instance.new("TextBox")
-			instances["X"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["X"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["X"].BackgroundTransparency = 0.8
-			instances["X"].ClearTextOnFocus = false
-			instances["X"].CursorPosition = -1
-			instances["X"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["X"].Name = "X"
-			instances["X"].PlaceholderColor3 = Color3.fromRGB(72, 61, 68)
-			instances["X"].PlaceholderText = "X"
-			instances["X"].Position = UDim2.new(0, 110, 0.5, 0)
-			instances["X"].RichText = true
-			instances["X"].Size = UDim2.new(0, 40, 0, 32)
-			instances["X"].Text = "0"
-			instances["X"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["X"].TextSize = 14
-			instances["X"].TextWrapped = true
-			instances["X"].ZIndex = 6
-			instances["X"]:AddTag("UIColor2")
-			instances["X"]:AddTag("UITransparency2")
+			instances["UIListLayout20"] = Instance.new("UIListLayout")
+			instances["UIListLayout20"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout20"].HorizontalAlignment = Enum.HorizontalAlignment.Right
+			instances["UIListLayout20"].Padding = UDim.new(0, 10)
+			instances["UIListLayout20"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout20"].VerticalAlignment = Enum.VerticalAlignment.Center
 
-			instances["UITextSizeConstraint17"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint17"].MaxTextSize = 14
+			instances["TextBox6"] = Instance.new("TextBox")
+			instances["TextBox6"].AnchorPoint = Vector2.new(0.5, 0.5)
+			instances["TextBox6"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["TextBox6"].BackgroundTransparency = 0.8
+			instances["TextBox6"].ClearTextOnFocus = false
+			instances["TextBox6"].LayoutOrder = 1
+			instances["TextBox6"].Position = UDim2.new(1, -5, 0.5, 0)
+			instances["TextBox6"].RichText = true
+			instances["TextBox6"].Size = UDim2.new(1, -150, 0, 32)
+			instances["TextBox6"].Text = ""
+			instances["TextBox6"].TextWrapped = true
+			instances["TextBox6"].ZIndex = 1e+07
 
-			instances["UICorner80"] = Instance.new("UICorner")
-			instances["UICorner80"].CornerRadius = UDim.new(0, 4)
+			instances["UICorner85"] = Instance.new("UICorner")
+			instances["UICorner85"].CornerRadius = UDim.new(0, 4)
 
-			instances["UIAspectRatioConstraint35"] = Instance.new("UIAspectRatioConstraint")
+			instances["UIPadding33"] = Instance.new("UIPadding")
+			instances["UIPadding33"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding33"].PaddingRight = UDim.new(0, 6)
 
-			instances["Y"] = Instance.new("TextBox")
-			instances["Y"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["Y"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["Y"].BackgroundTransparency = 0.8
-			instances["Y"].ClearTextOnFocus = false
-			instances["Y"].CursorPosition = -1
-			instances["Y"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["Y"].LayoutOrder = 1
-			instances["Y"].Name = "Y"
-			instances["Y"].PlaceholderColor3 = Color3.fromRGB(72, 61, 68)
-			instances["Y"].PlaceholderText = "Y"
-			instances["Y"].Position = UDim2.new(0, 110, 0.5, 0)
-			instances["Y"].RichText = true
-			instances["Y"].Size = UDim2.new(0, 40, 0, 32)
-			instances["Y"].Text = "0"
-			instances["Y"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Y"].TextSize = 14
-			instances["Y"].TextWrapped = true
-			instances["Y"].ZIndex = 6
-			instances["Y"]:AddTag("UIColor2")
-			instances["Y"]:AddTag("UITransparency2")
-
-			instances["UITextSizeConstraint18"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint18"].MaxTextSize = 14
-
-			instances["UICorner81"] = Instance.new("UICorner")
-			instances["UICorner81"].CornerRadius = UDim.new(0, 4)
-
-			instances["UIAspectRatioConstraint36"] = Instance.new("UIAspectRatioConstraint")
-
-			instances["Z"] = Instance.new("TextBox")
-			instances["Z"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["Z"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["Z"].BackgroundTransparency = 0.8
-			instances["Z"].ClearTextOnFocus = false
-			instances["Z"].CursorPosition = -1
-			instances["Z"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["Z"].LayoutOrder = 2
-			instances["Z"].Name = "Z"
-			instances["Z"].PlaceholderColor3 = Color3.fromRGB(72, 61, 68)
-			instances["Z"].PlaceholderText = "Z"
-			instances["Z"].Position = UDim2.new(0, 110, 0.5, 0)
-			instances["Z"].RichText = true
-			instances["Z"].Size = UDim2.new(0, 40, 0, 32)
-			instances["Z"].Text = "0"
-			instances["Z"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Z"].TextSize = 14
-			instances["Z"].TextWrapped = true
-			instances["Z"].ZIndex = 6
-			instances["Z"]:AddTag("UIColor2")
-			instances["Z"]:AddTag("UITransparency2")
-
-			instances["UITextSizeConstraint19"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint19"].MaxTextSize = 14
-
-			instances["UICorner82"] = Instance.new("UICorner")
-			instances["UICorner82"].CornerRadius = UDim.new(0, 4)
-
-			instances["UIAspectRatioConstraint37"] = Instance.new("UIAspectRatioConstraint")
-
-			instances["UIPadding32"] = Instance.new("UIPadding")
-			instances["UIPadding32"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding32"].PaddingRight = UDim.new(0, 6)
-
-			instances["SliderExample"] = Instance.new("Frame")
-			instances["SliderExample"].Active = true
-			instances["SliderExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["SliderExample"].BackgroundTransparency = 0.8
-			instances["SliderExample"].LayoutOrder = 5
-			instances["SliderExample"].Name = "SliderExample"
-			instances["SliderExample"].Size = UDim2.new(1, 0, 0, 42)
-			instances["SliderExample"].ZIndex = 4
-			instances["SliderExample"]:AddTag("UIColor2")
-			instances["SliderExample"]:AddTag("UITransparency2")
+			instances["ButtonExample"] = Instance.new("Frame")
+			instances["ButtonExample"].Active = true
+			instances["ButtonExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["ButtonExample"].BackgroundTransparency = 0.8
+			instances["ButtonExample"].LayoutOrder = 1
+			instances["ButtonExample"].Name = "ButtonExample"
+			instances["ButtonExample"].Size = UDim2.new(1, 0, 0, 42)
+			instances["ButtonExample"].Visible = false
+			instances["ButtonExample"].ZIndex = 1e+07
+			instances["ButtonExample"]:AddTag("UIColor2")
+			instances["ButtonExample"]:AddTag("UITransparency2")
 
 			instances["Label5"] = Instance.new("TextLabel")
 			instances["Label5"].Active = true
@@ -2028,243 +2043,16 @@ do
 			instances["Label5"].Name = "Label"
 			instances["Label5"].Position = UDim2.new(0, 0, 0.5, 0)
 			instances["Label5"].RichText = true
-			instances["Label5"].Size = UDim2.new(0, 100, 0, 32)
+			instances["Label5"].Size = UDim2.new(1, -191, 0, 32)
 			instances["Label5"].Text = "ExampleText"
 			instances["Label5"].TextColor3 = Color3.fromRGB(47, 40, 44)
 			instances["Label5"].TextSize = 15
 			instances["Label5"].TextWrapped = true
 			instances["Label5"].TextXAlignment = Enum.TextXAlignment.Left
-			instances["Label5"].ZIndex = 5
-
-			instances["UIPadding43"] = Instance.new("UIPadding")
-			instances["UIPadding43"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding43"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding43"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding43"].PaddingTop = UDim.new(0, 2)
+			instances["Label5"].ZIndex = 1e+07
 
 			instances["UITextSizeConstraint11"] = Instance.new("UITextSizeConstraint")
 			instances["UITextSizeConstraint11"].MaxTextSize = 14
-
-			instances["UICorner56"] = Instance.new("UICorner")
-
-			instances["Folder3"] = Instance.new("Folder")
-
-			instances["UIListLayout18"] = Instance.new("UIListLayout")
-			instances["UIListLayout18"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout18"].HorizontalAlignment = Enum.HorizontalAlignment.Right
-			instances["UIListLayout18"].Padding = UDim.new(0, 10)
-			instances["UIListLayout18"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout18"].VerticalAlignment = Enum.VerticalAlignment.Center
-
-			instances["Count"] = Instance.new("TextBox")
-			instances["Count"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["Count"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["Count"].BackgroundTransparency = 0.8
-			instances["Count"].ClearTextOnFocus = false
-			instances["Count"].CursorPosition = -1
-			instances["Count"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["Count"].Name = "Count"
-			instances["Count"].PlaceholderColor3 = Color3.fromRGB(72, 61, 68)
-			instances["Count"].Position = UDim2.new(0, 110, 0.5, 0)
-			instances["Count"].RichText = true
-			instances["Count"].Size = UDim2.new(0, 45, 0, 32)
-			instances["Count"].Text = "4.5"
-			instances["Count"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Count"].TextSize = 14
-			instances["Count"].TextWrapped = true
-			instances["Count"].ZIndex = 6
-			instances["Count"]:AddTag("UIColor2")
-			instances["Count"]:AddTag("UITransparency2")
-
-			instances["UITextSizeConstraint20"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint20"].MaxTextSize = 14
-
-			instances["UICorner83"] = Instance.new("UICorner")
-			instances["UICorner83"].CornerRadius = UDim.new(0, 4)
-
-			instances["Slider"] = Instance.new("TextButton")
-			instances["Slider"].AnchorPoint = Vector2.new(1, 0.5)
-			instances["Slider"].BackgroundColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Slider"].BorderSizePixel = 0
-			instances["Slider"].LayoutOrder = 1
-			instances["Slider"].Name = "Slider"
-			instances["Slider"].Position = UDim2.new(1, -8, 0.5, 0)
-			instances["Slider"].Size = UDim2.new(0, 130, 0, 2)
-			instances["Slider"].Text = ""
-			instances["Slider"].TextTransparency = 1
-			instances["Slider"].ZIndex = 6
-
-			instances["Select"] = Instance.new("TextButton")
-			instances["Select"].AnchorPoint = Vector2.new(0.5, 0.5)
-			instances["Select"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			instances["Select"].BorderColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Select"].Name = "Select"
-			instances["Select"].Position = UDim2.new(0, 0, 0.5, 0)
-			instances["Select"].Size = UDim2.new(0, 9, 0.5, 18)
-			instances["Select"].Text = ""
-			instances["Select"].TextTransparency = 1
-			instances["Select"].ZIndex = 7
-
-			instances["UIPadding33"] = Instance.new("UIPadding")
-			instances["UIPadding33"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding33"].PaddingRight = UDim.new(0, 6)
-
-			instances["ControlExample"] = Instance.new("Frame")
-			instances["ControlExample"].Active = true
-			instances["ControlExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["ControlExample"].BackgroundTransparency = 0.8
-			instances["ControlExample"].LayoutOrder = 1
-			instances["ControlExample"].Name = "ControlExample"
-			instances["ControlExample"].Size = UDim2.new(1, 0, 0, 42)
-			instances["ControlExample"].ZIndex = 4
-			instances["ControlExample"]:AddTag("UIColor2")
-			instances["ControlExample"]:AddTag("UITransparency2")
-
-			instances["Label6"] = Instance.new("TextLabel")
-			instances["Label6"].Active = true
-			instances["Label6"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["Label6"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			instances["Label6"].BackgroundTransparency = 1
-			instances["Label6"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["Label6"].Name = "Label"
-			instances["Label6"].Position = UDim2.new(0, 0, 0.5, 0)
-			instances["Label6"].RichText = true
-			instances["Label6"].Size = UDim2.new(0, 100, 0, 32)
-			instances["Label6"].Text = "ExampleText"
-			instances["Label6"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Label6"].TextSize = 15
-			instances["Label6"].TextWrapped = true
-			instances["Label6"].TextXAlignment = Enum.TextXAlignment.Left
-			instances["Label6"].ZIndex = 5
-
-			instances["UIPadding44"] = Instance.new("UIPadding")
-			instances["UIPadding44"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding44"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding44"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding44"].PaddingTop = UDim.new(0, 2)
-
-			instances["UITextSizeConstraint12"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint12"].MaxTextSize = 14
-
-			instances["UICorner57"] = Instance.new("UICorner")
-
-			instances["Folder4"] = Instance.new("Folder")
-
-			instances["UIListLayout19"] = Instance.new("UIListLayout")
-			instances["UIListLayout19"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout19"].HorizontalAlignment = Enum.HorizontalAlignment.Right
-			instances["UIListLayout19"].Padding = UDim.new(0, 10)
-			instances["UIListLayout19"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout19"].VerticalAlignment = Enum.VerticalAlignment.Center
-
-			instances["ThirdControl"] = Instance.new("TextButton")
-			instances["ThirdControl"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["ThirdControl"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["ThirdControl"].BackgroundTransparency = 0.8
-			instances["ThirdControl"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["ThirdControl"].LayoutOrder = 2
-			instances["ThirdControl"].Name = "ThirdControl"
-			instances["ThirdControl"].Position = UDim2.new(0, 110, 0.5, 0)
-			instances["ThirdControl"].RichText = true
-			instances["ThirdControl"].Size = UDim2.new(0, 40, 0, 32)
-			instances["ThirdControl"].Text = ""
-			instances["ThirdControl"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["ThirdControl"].TextSize = 14
-			instances["ThirdControl"].TextWrapped = true
-			instances["ThirdControl"].ZIndex = 6
-			instances["ThirdControl"]:AddTag("UIColor2")
-			instances["ThirdControl"]:AddTag("UITransparency2")
-
-			instances["UITextSizeConstraint21"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint21"].MaxTextSize = 14
-
-			instances["UICorner84"] = Instance.new("UICorner")
-			instances["UICorner84"].CornerRadius = UDim.new(0, 4)
-
-			instances["UIAspectRatioConstraint38"] = Instance.new("UIAspectRatioConstraint")
-
-			instances["SecondControl"] = Instance.new("TextButton")
-			instances["SecondControl"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["SecondControl"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["SecondControl"].BackgroundTransparency = 0.8
-			instances["SecondControl"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["SecondControl"].LayoutOrder = 1
-			instances["SecondControl"].Name = "SecondControl"
-			instances["SecondControl"].Position = UDim2.new(0, 110, 0.5, 0)
-			instances["SecondControl"].RichText = true
-			instances["SecondControl"].Size = UDim2.new(0, 40, 0, 32)
-			instances["SecondControl"].Text = ""
-			instances["SecondControl"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["SecondControl"].TextSize = 14
-			instances["SecondControl"].TextWrapped = true
-			instances["SecondControl"].ZIndex = 6
-			instances["SecondControl"]:AddTag("UIColor2")
-			instances["SecondControl"]:AddTag("UITransparency2")
-
-			instances["UITextSizeConstraint22"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint22"].MaxTextSize = 14
-
-			instances["UICorner85"] = Instance.new("UICorner")
-			instances["UICorner85"].CornerRadius = UDim.new(0, 4)
-
-			instances["UIAspectRatioConstraint39"] = Instance.new("UIAspectRatioConstraint")
-
-			instances["FirstControl"] = Instance.new("TextButton")
-			instances["FirstControl"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["FirstControl"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["FirstControl"].BackgroundTransparency = 0.8
-			instances["FirstControl"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["FirstControl"].Name = "FirstControl"
-			instances["FirstControl"].Position = UDim2.new(0, 110, 0.5, 0)
-			instances["FirstControl"].RichText = true
-			instances["FirstControl"].Size = UDim2.new(0, 40, 0, 32)
-			instances["FirstControl"].Text = ""
-			instances["FirstControl"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["FirstControl"].TextSize = 14
-			instances["FirstControl"].TextWrapped = true
-			instances["FirstControl"].ZIndex = 6
-			instances["FirstControl"]:AddTag("UIColor2")
-			instances["FirstControl"]:AddTag("UITransparency2")
-
-			instances["UITextSizeConstraint23"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint23"].MaxTextSize = 14
-
-			instances["UICorner86"] = Instance.new("UICorner")
-			instances["UICorner86"].CornerRadius = UDim.new(0, 4)
-
-			instances["UIAspectRatioConstraint40"] = Instance.new("UIAspectRatioConstraint")
-
-			instances["UIPadding34"] = Instance.new("UIPadding")
-			instances["UIPadding34"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding34"].PaddingRight = UDim.new(0, 6)
-
-			instances["Color3Example"] = Instance.new("Frame")
-			instances["Color3Example"].Active = true
-			instances["Color3Example"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["Color3Example"].BackgroundTransparency = 0.8
-			instances["Color3Example"].LayoutOrder = 1
-			instances["Color3Example"].Name = "Color3Example"
-			instances["Color3Example"].Size = UDim2.new(1, 0, 0, 42)
-			instances["Color3Example"].ZIndex = 4
-			instances["Color3Example"]:AddTag("UIColor2")
-			instances["Color3Example"]:AddTag("UITransparency2")
-
-			instances["Label7"] = Instance.new("TextLabel")
-			instances["Label7"].Active = true
-			instances["Label7"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["Label7"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			instances["Label7"].BackgroundTransparency = 1
-			instances["Label7"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["Label7"].Name = "Label"
-			instances["Label7"].Position = UDim2.new(0, 0, 0.5, 0)
-			instances["Label7"].RichText = true
-			instances["Label7"].Size = UDim2.new(0, 100, 0, 32)
-			instances["Label7"].Text = "ExampleText"
-			instances["Label7"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Label7"].TextSize = 15
-			instances["Label7"].TextWrapped = true
-			instances["Label7"].TextXAlignment = Enum.TextXAlignment.Left
-			instances["Label7"].ZIndex = 5
 
 			instances["UIPadding45"] = Instance.new("UIPadding")
 			instances["UIPadding45"].PaddingBottom = UDim.new(0, 2)
@@ -2272,84 +2060,9 @@ do
 			instances["UIPadding45"].PaddingRight = UDim.new(0, 2)
 			instances["UIPadding45"].PaddingTop = UDim.new(0, 2)
 
-			instances["UITextSizeConstraint13"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint13"].MaxTextSize = 14
+			instances["UICorner57"] = Instance.new("UICorner")
 
-			instances["UICorner58"] = Instance.new("UICorner")
-
-			instances["Folder5"] = Instance.new("Folder")
-
-			instances["UIListLayout20"] = Instance.new("UIListLayout")
-			instances["UIListLayout20"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout20"].HorizontalAlignment = Enum.HorizontalAlignment.Right
-			instances["UIListLayout20"].Padding = UDim.new(0, 10)
-			instances["UIListLayout20"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout20"].VerticalAlignment = Enum.VerticalAlignment.Center
-
-			instances["Color"] = Instance.new("TextButton")
-			instances["Color"].AnchorPoint = Vector2.new(0.5, 0.5)
-			instances["Color"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			instances["Color"].LayoutOrder = 1
-			instances["Color"].Name = "Color"
-			instances["Color"].Position = UDim2.new(1, -5, 0.5, 0)
-			instances["Color"].Size = UDim2.new(0, 100, 0, 32)
-			instances["Color"].Text = ""
-			instances["Color"].ZIndex = 6
-
-			instances["UICorner87"] = Instance.new("UICorner")
-			instances["UICorner87"].CornerRadius = UDim.new(0, 4)
-
-			instances["UIAspectRatioConstraint41"] = Instance.new("UIAspectRatioConstraint")
-
-			instances["UIStroke14"] = Instance.new("UIStroke")
-			instances["UIStroke14"].ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-			instances["UIStroke14"].Thickness = 2
-			instances["UIStroke14"].Transparency = 0.75
-
-			instances["UIPadding35"] = Instance.new("UIPadding")
-			instances["UIPadding35"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding35"].PaddingRight = UDim.new(0, 6)
-
-			instances["ButtonExample"] = Instance.new("Frame")
-			instances["ButtonExample"].Active = true
-			instances["ButtonExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["ButtonExample"].BackgroundTransparency = 0.8
-			instances["ButtonExample"].LayoutOrder = 1
-			instances["ButtonExample"].Name = "ButtonExample"
-			instances["ButtonExample"].Size = UDim2.new(1, 0, 0, 42)
-			instances["ButtonExample"].ZIndex = 4
-			instances["ButtonExample"]:AddTag("UIColor2")
-			instances["ButtonExample"]:AddTag("UITransparency2")
-
-			instances["Label8"] = Instance.new("TextLabel")
-			instances["Label8"].Active = true
-			instances["Label8"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["Label8"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			instances["Label8"].BackgroundTransparency = 1
-			instances["Label8"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["Label8"].Name = "Label"
-			instances["Label8"].Position = UDim2.new(0, 0, 0.5, 0)
-			instances["Label8"].RichText = true
-			instances["Label8"].Size = UDim2.new(0, 100, 0, 32)
-			instances["Label8"].Text = "ExampleText"
-			instances["Label8"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Label8"].TextSize = 15
-			instances["Label8"].TextWrapped = true
-			instances["Label8"].TextXAlignment = Enum.TextXAlignment.Left
-			instances["Label8"].ZIndex = 5
-
-			instances["UITextSizeConstraint14"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint14"].MaxTextSize = 14
-
-			instances["UIPadding46"] = Instance.new("UIPadding")
-			instances["UIPadding46"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding46"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding46"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding46"].PaddingTop = UDim.new(0, 2)
-
-			instances["UICorner59"] = Instance.new("UICorner")
-
-			instances["Folder6"] = Instance.new("Folder")
+			instances["Folder4"] = Instance.new("Folder")
 
 			instances["UIListLayout21"] = Instance.new("UIListLayout")
 			instances["UIListLayout21"].FillDirection = Enum.FillDirection.Horizontal
@@ -2367,7 +2080,7 @@ do
 			instances["Button"].Position = UDim2.new(1, -5, 0.5, 0)
 			instances["Button"].Size = UDim2.new(0, 45, 0, 32)
 			instances["Button"].Text = ""
-			instances["Button"].ZIndex = 6
+			instances["Button"].ZIndex = 1e+07
 			instances["Button"]:AddTag("UIColor2")
 
 			instances["Value3"] = Instance.new("TextLabel")
@@ -2382,64 +2095,65 @@ do
 			instances["Value3"].TextScaled = true
 			instances["Value3"].TextSize = 12
 			instances["Value3"].TextWrapped = true
-			instances["Value3"].ZIndex = 7
+			instances["Value3"].ZIndex = 1e+07
 
-			instances["UIPadding51"] = Instance.new("UIPadding")
-			instances["UIPadding51"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding51"].PaddingLeft = UDim.new(0, 4)
-			instances["UIPadding51"].PaddingRight = UDim.new(0, 4)
-			instances["UIPadding51"].PaddingTop = UDim.new(0, 2)
+			instances["UIPadding53"] = Instance.new("UIPadding")
+			instances["UIPadding53"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding53"].PaddingLeft = UDim.new(0, 4)
+			instances["UIPadding53"].PaddingRight = UDim.new(0, 4)
+			instances["UIPadding53"].PaddingTop = UDim.new(0, 2)
 
-			instances["UITextSizeConstraint26"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint26"].MaxTextSize = 14
+			instances["UITextSizeConstraint27"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint27"].MaxTextSize = 14
 
-			instances["UICorner88"] = Instance.new("UICorner")
-			instances["UICorner88"].CornerRadius = UDim.new(0, 4)
+			instances["UICorner86"] = Instance.new("UICorner")
+			instances["UICorner86"].CornerRadius = UDim.new(0, 4)
 
-			instances["UIPadding36"] = Instance.new("UIPadding")
-			instances["UIPadding36"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding36"].PaddingRight = UDim.new(0, 6)
+			instances["UIPadding34"] = Instance.new("UIPadding")
+			instances["UIPadding34"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding34"].PaddingRight = UDim.new(0, 6)
 
-			instances["TextBoxExample"] = Instance.new("Frame")
-			instances["TextBoxExample"].Active = true
-			instances["TextBoxExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["TextBoxExample"].BackgroundTransparency = 0.8
-			instances["TextBoxExample"].LayoutOrder = 1
-			instances["TextBoxExample"].Name = "TextBoxExample"
-			instances["TextBoxExample"].Size = UDim2.new(1, 0, 0, 42)
-			instances["TextBoxExample"].ZIndex = 4
-			instances["TextBoxExample"]:AddTag("UIColor2")
-			instances["TextBoxExample"]:AddTag("UITransparency2")
+			instances["Color3Example"] = Instance.new("Frame")
+			instances["Color3Example"].Active = true
+			instances["Color3Example"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["Color3Example"].BackgroundTransparency = 0.8
+			instances["Color3Example"].LayoutOrder = 1
+			instances["Color3Example"].Name = "Color3Example"
+			instances["Color3Example"].Size = UDim2.new(1, 0, 0, 42)
+			instances["Color3Example"].Visible = false
+			instances["Color3Example"].ZIndex = 1e+07
+			instances["Color3Example"]:AddTag("UIColor2")
+			instances["Color3Example"]:AddTag("UITransparency2")
 
-			instances["Label9"] = Instance.new("TextLabel")
-			instances["Label9"].Active = true
-			instances["Label9"].AnchorPoint = Vector2.new(0, 0.5)
-			instances["Label9"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-			instances["Label9"].BackgroundTransparency = 1
-			instances["Label9"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-			instances["Label9"].Name = "Label"
-			instances["Label9"].Position = UDim2.new(0, 0, 0.5, 0)
-			instances["Label9"].RichText = true
-			instances["Label9"].Size = UDim2.new(0, 100, 0, 32)
-			instances["Label9"].Text = "ExampleText"
-			instances["Label9"].TextColor3 = Color3.fromRGB(47, 40, 44)
-			instances["Label9"].TextSize = 15
-			instances["Label9"].TextWrapped = true
-			instances["Label9"].TextXAlignment = Enum.TextXAlignment.Left
-			instances["Label9"].ZIndex = 5
+			instances["Label6"] = Instance.new("TextLabel")
+			instances["Label6"].Active = true
+			instances["Label6"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["Label6"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["Label6"].BackgroundTransparency = 1
+			instances["Label6"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["Label6"].Name = "Label"
+			instances["Label6"].Position = UDim2.new(0, 0, 0.5, 0)
+			instances["Label6"].RichText = true
+			instances["Label6"].Size = UDim2.new(1, -191, 0, 32)
+			instances["Label6"].Text = "ExampleText"
+			instances["Label6"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Label6"].TextSize = 15
+			instances["Label6"].TextWrapped = true
+			instances["Label6"].TextXAlignment = Enum.TextXAlignment.Left
+			instances["Label6"].ZIndex = 1e+07
 
-			instances["UITextSizeConstraint15"] = Instance.new("UITextSizeConstraint")
-			instances["UITextSizeConstraint15"].MaxTextSize = 14
+			instances["UIPadding46"] = Instance.new("UIPadding")
+			instances["UIPadding46"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding46"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding46"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding46"].PaddingTop = UDim.new(0, 2)
 
-			instances["UIPadding47"] = Instance.new("UIPadding")
-			instances["UIPadding47"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding47"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding47"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding47"].PaddingTop = UDim.new(0, 2)
+			instances["UITextSizeConstraint12"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint12"].MaxTextSize = 14
 
-			instances["UICorner60"] = Instance.new("UICorner")
+			instances["UICorner58"] = Instance.new("UICorner")
 
-			instances["Folder7"] = Instance.new("Folder")
+			instances["Folder5"] = Instance.new("Folder")
 
 			instances["UIListLayout22"] = Instance.new("UIListLayout")
 			instances["UIListLayout22"].FillDirection = Enum.FillDirection.Horizontal
@@ -2448,26 +2162,306 @@ do
 			instances["UIListLayout22"].SortOrder = Enum.SortOrder.LayoutOrder
 			instances["UIListLayout22"].VerticalAlignment = Enum.VerticalAlignment.Center
 
-			instances["TextBox6"] = Instance.new("TextBox")
-			instances["TextBox6"].AnchorPoint = Vector2.new(0.5, 0.5)
-			instances["TextBox6"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
-			instances["TextBox6"].BackgroundTransparency = 0.8
-			instances["TextBox6"].ClearTextOnFocus = false
-			instances["TextBox6"].CursorPosition = -1
-			instances["TextBox6"].LayoutOrder = 1
-			instances["TextBox6"].Position = UDim2.new(1, -5, 0.5, 0)
-			instances["TextBox6"].RichText = true
-			instances["TextBox6"].Size = UDim2.new(1, -150, 0, 32)
-			instances["TextBox6"].Text = ""
-			instances["TextBox6"].TextWrapped = true
-			instances["TextBox6"].ZIndex = 6
+			instances["Color"] = Instance.new("TextButton")
+			instances["Color"].AnchorPoint = Vector2.new(0.5, 0.5)
+			instances["Color"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["Color"].LayoutOrder = 1
+			instances["Color"].Name = "Color"
+			instances["Color"].Position = UDim2.new(1, -5, 0.5, 0)
+			instances["Color"].Size = UDim2.new(0, 100, 0, 32)
+			instances["Color"].Text = ""
+			instances["Color"].ZIndex = 1e+07
+
+			instances["UICorner87"] = Instance.new("UICorner")
+			instances["UICorner87"].CornerRadius = UDim.new(0, 4)
+
+			instances["UIAspectRatioConstraint38"] = Instance.new("UIAspectRatioConstraint")
+
+			instances["UIStroke14"] = Instance.new("UIStroke")
+			instances["UIStroke14"].ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			instances["UIStroke14"].Thickness = 2
+			instances["UIStroke14"].Transparency = 0.75
+
+			instances["UIPadding35"] = Instance.new("UIPadding")
+			instances["UIPadding35"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding35"].PaddingRight = UDim.new(0, 6)
+
+			instances["ControlExample"] = Instance.new("Frame")
+			instances["ControlExample"].Active = true
+			instances["ControlExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["ControlExample"].BackgroundTransparency = 0.8
+			instances["ControlExample"].LayoutOrder = 1
+			instances["ControlExample"].Name = "ControlExample"
+			instances["ControlExample"].Size = UDim2.new(1, 0, 0, 42)
+			instances["ControlExample"].Visible = false
+			instances["ControlExample"].ZIndex = 1e+07
+			instances["ControlExample"]:AddTag("UIColor2")
+			instances["ControlExample"]:AddTag("UITransparency2")
+
+			instances["Label7"] = Instance.new("TextLabel")
+			instances["Label7"].Active = true
+			instances["Label7"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["Label7"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["Label7"].BackgroundTransparency = 1
+			instances["Label7"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["Label7"].Name = "Label"
+			instances["Label7"].Position = UDim2.new(0, 0, 0.5, 0)
+			instances["Label7"].RichText = true
+			instances["Label7"].Size = UDim2.new(1, -191, 0, 32)
+			instances["Label7"].Text = "ExampleText"
+			instances["Label7"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Label7"].TextSize = 15
+			instances["Label7"].TextWrapped = true
+			instances["Label7"].TextXAlignment = Enum.TextXAlignment.Left
+			instances["Label7"].ZIndex = 1e+07
+
+			instances["UIPadding47"] = Instance.new("UIPadding")
+			instances["UIPadding47"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding47"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding47"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding47"].PaddingTop = UDim.new(0, 2)
+
+			instances["UITextSizeConstraint13"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint13"].MaxTextSize = 14
+
+			instances["UICorner59"] = Instance.new("UICorner")
+
+			instances["Folder6"] = Instance.new("Folder")
+
+			instances["UIListLayout23"] = Instance.new("UIListLayout")
+			instances["UIListLayout23"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout23"].HorizontalAlignment = Enum.HorizontalAlignment.Right
+			instances["UIListLayout23"].Padding = UDim.new(0, 10)
+			instances["UIListLayout23"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout23"].VerticalAlignment = Enum.VerticalAlignment.Center
+
+			instances["ThirdControl"] = Instance.new("TextButton")
+			instances["ThirdControl"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["ThirdControl"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["ThirdControl"].BackgroundTransparency = 0.8
+			instances["ThirdControl"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["ThirdControl"].LayoutOrder = 2
+			instances["ThirdControl"].Name = "ThirdControl"
+			instances["ThirdControl"].Position = UDim2.new(0, 110, 0.5, 0)
+			instances["ThirdControl"].RichText = true
+			instances["ThirdControl"].Size = UDim2.new(0, 40, 0, 32)
+			instances["ThirdControl"].Text = ""
+			instances["ThirdControl"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["ThirdControl"].TextSize = 14
+			instances["ThirdControl"].TextWrapped = true
+			instances["ThirdControl"].ZIndex = 1e+07
+			instances["ThirdControl"]:AddTag("UIColor2")
+			instances["ThirdControl"]:AddTag("UITransparency2")
+
+			instances["UITextSizeConstraint21"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint21"].MaxTextSize = 14
+
+			instances["UICorner88"] = Instance.new("UICorner")
+			instances["UICorner88"].CornerRadius = UDim.new(0, 4)
+
+			instances["UIAspectRatioConstraint39"] = Instance.new("UIAspectRatioConstraint")
+
+			instances["SecondControl"] = Instance.new("TextButton")
+			instances["SecondControl"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["SecondControl"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["SecondControl"].BackgroundTransparency = 0.8
+			instances["SecondControl"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["SecondControl"].LayoutOrder = 1
+			instances["SecondControl"].Name = "SecondControl"
+			instances["SecondControl"].Position = UDim2.new(0, 110, 0.5, 0)
+			instances["SecondControl"].RichText = true
+			instances["SecondControl"].Size = UDim2.new(0, 40, 0, 32)
+			instances["SecondControl"].Text = ""
+			instances["SecondControl"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["SecondControl"].TextSize = 14
+			instances["SecondControl"].TextWrapped = true
+			instances["SecondControl"].ZIndex = 1e+07
+			instances["SecondControl"]:AddTag("UIColor2")
+			instances["SecondControl"]:AddTag("UITransparency2")
+
+			instances["UITextSizeConstraint22"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint22"].MaxTextSize = 14
 
 			instances["UICorner89"] = Instance.new("UICorner")
 			instances["UICorner89"].CornerRadius = UDim.new(0, 4)
 
+			instances["UIAspectRatioConstraint40"] = Instance.new("UIAspectRatioConstraint")
+
+			instances["FirstControl"] = Instance.new("TextButton")
+			instances["FirstControl"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["FirstControl"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["FirstControl"].BackgroundTransparency = 0.8
+			instances["FirstControl"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["FirstControl"].Name = "FirstControl"
+			instances["FirstControl"].Position = UDim2.new(0, 110, 0.5, 0)
+			instances["FirstControl"].RichText = true
+			instances["FirstControl"].Size = UDim2.new(0, 40, 0, 32)
+			instances["FirstControl"].Text = ""
+			instances["FirstControl"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["FirstControl"].TextSize = 14
+			instances["FirstControl"].TextWrapped = true
+			instances["FirstControl"].ZIndex = 1e+07
+			instances["FirstControl"]:AddTag("UIColor2")
+			instances["FirstControl"]:AddTag("UITransparency2")
+
+			instances["UITextSizeConstraint23"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint23"].MaxTextSize = 14
+
+			instances["UICorner90"] = Instance.new("UICorner")
+			instances["UICorner90"].CornerRadius = UDim.new(0, 4)
+
+			instances["UIAspectRatioConstraint41"] = Instance.new("UIAspectRatioConstraint")
+
+			instances["UIPadding36"] = Instance.new("UIPadding")
+			instances["UIPadding36"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding36"].PaddingRight = UDim.new(0, 6)
+
+			instances["SliderExample"] = Instance.new("Frame")
+			instances["SliderExample"].Active = true
+			instances["SliderExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["SliderExample"].BackgroundTransparency = 0.8
+			instances["SliderExample"].LayoutOrder = 1
+			instances["SliderExample"].Name = "SliderExample"
+			instances["SliderExample"].Size = UDim2.new(1, 0, 0, 42)
+			instances["SliderExample"].Visible = false
+			instances["SliderExample"].ZIndex = 1e+07
+			instances["SliderExample"]:AddTag("UIColor2")
+			instances["SliderExample"]:AddTag("UITransparency2")
+
+			instances["Label8"] = Instance.new("TextLabel")
+			instances["Label8"].Active = true
+			instances["Label8"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["Label8"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["Label8"].BackgroundTransparency = 1
+			instances["Label8"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["Label8"].Name = "Label"
+			instances["Label8"].Position = UDim2.new(0, 0, 0.5, 0)
+			instances["Label8"].RichText = true
+			instances["Label8"].Size = UDim2.new(1, -191, 0, 32)
+			instances["Label8"].Text = "ExampleText"
+			instances["Label8"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Label8"].TextSize = 15
+			instances["Label8"].TextWrapped = true
+			instances["Label8"].TextXAlignment = Enum.TextXAlignment.Left
+			instances["Label8"].ZIndex = 1e+07
+
+			instances["UIPadding48"] = Instance.new("UIPadding")
+			instances["UIPadding48"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding48"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding48"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding48"].PaddingTop = UDim.new(0, 2)
+
+			instances["UITextSizeConstraint14"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint14"].MaxTextSize = 14
+
+			instances["UICorner60"] = Instance.new("UICorner")
+
+			instances["Folder7"] = Instance.new("Folder")
+
+			instances["UIListLayout24"] = Instance.new("UIListLayout")
+			instances["UIListLayout24"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout24"].HorizontalAlignment = Enum.HorizontalAlignment.Right
+			instances["UIListLayout24"].Padding = UDim.new(0, 10)
+			instances["UIListLayout24"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout24"].VerticalAlignment = Enum.VerticalAlignment.Center
+
+			instances["Count"] = Instance.new("TextBox")
+			instances["Count"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["Count"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["Count"].BackgroundTransparency = 0.8
+			instances["Count"].ClearTextOnFocus = false
+			instances["Count"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["Count"].Name = "Count"
+			instances["Count"].PlaceholderColor3 = Color3.fromRGB(72, 61, 68)
+			instances["Count"].Position = UDim2.new(0, 110, 0.5, 0)
+			instances["Count"].RichText = true
+			instances["Count"].Size = UDim2.new(0, 45, 0, 32)
+			instances["Count"].Text = "4.5"
+			instances["Count"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Count"].TextSize = 14
+			instances["Count"].TextWrapped = true
+			instances["Count"].ZIndex = 1e+07
+			instances["Count"]:AddTag("UIColor2")
+			instances["Count"]:AddTag("UITransparency2")
+
+			instances["UITextSizeConstraint24"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint24"].MaxTextSize = 14
+
+			instances["UICorner91"] = Instance.new("UICorner")
+			instances["UICorner91"].CornerRadius = UDim.new(0, 4)
+
+			instances["Slider"] = Instance.new("TextButton")
+			instances["Slider"].AnchorPoint = Vector2.new(1, 0.5)
+			instances["Slider"].BackgroundColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Slider"].BorderSizePixel = 0
+			instances["Slider"].LayoutOrder = 1
+			instances["Slider"].Name = "Slider"
+			instances["Slider"].Position = UDim2.new(1, -8, 0.5, 0)
+			instances["Slider"].Size = UDim2.new(0, 130, 0, 2)
+			instances["Slider"].Text = ""
+			instances["Slider"].TextTransparency = 1
+			instances["Slider"].ZIndex = 1e+07
+
+			instances["Select"] = Instance.new("TextButton")
+			instances["Select"].AnchorPoint = Vector2.new(0.5, 0.5)
+			instances["Select"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["Select"].BorderColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Select"].Name = "Select"
+			instances["Select"].Position = UDim2.new(0, 0, 0.5, 0)
+			instances["Select"].Size = UDim2.new(0, 9, 0.5, 18)
+			instances["Select"].Text = ""
+			instances["Select"].TextTransparency = 1
+			instances["Select"].ZIndex = 1e+07
+
 			instances["UIPadding37"] = Instance.new("UIPadding")
 			instances["UIPadding37"].PaddingLeft = UDim.new(0, 6)
 			instances["UIPadding37"].PaddingRight = UDim.new(0, 6)
+
+			instances["TextExample"] = Instance.new("Frame")
+			instances["TextExample"].Active = true
+			instances["TextExample"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["TextExample"].BackgroundTransparency = 0.8
+			instances["TextExample"].LayoutOrder = 1
+			instances["TextExample"].Name = "TextExample"
+			instances["TextExample"].Position = UDim2.new(0, 5, 0, 5)
+			instances["TextExample"].Size = UDim2.new(1, 0, 0, 42)
+			instances["TextExample"].Visible = false
+			instances["TextExample"].ZIndex = 1e+07
+			instances["TextExample"]:AddTag("GuiConstructor")
+			instances["TextExample"]:AddTag("UIColor2")
+			instances["TextExample"]:AddTag("UITransparency2")
+
+			instances["UICorner61"] = Instance.new("UICorner")
+
+			instances["Label9"] = Instance.new("TextLabel")
+			instances["Label9"].Active = true
+			instances["Label9"].AnchorPoint = Vector2.new(0, 0.5)
+			instances["Label9"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["Label9"].BackgroundTransparency = 1
+			instances["Label9"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["Label9"].Name = "Label"
+			instances["Label9"].Position = UDim2.new(0, 0, 0.5, 0)
+			instances["Label9"].RichText = true
+			instances["Label9"].Size = UDim2.new(1, 0, 0, 32)
+			instances["Label9"].Text = "ExampleText"
+			instances["Label9"].TextColor3 = Color3.fromRGB(47, 40, 44)
+			instances["Label9"].TextSize = 15
+			instances["Label9"].TextWrapped = true
+			instances["Label9"].ZIndex = 1e+07
+
+			instances["UIPadding49"] = Instance.new("UIPadding")
+			instances["UIPadding49"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding49"].PaddingLeft = UDim.new(0, 2)
+			instances["UIPadding49"].PaddingTop = UDim.new(0, 2)
+
+			instances["UICorner73"] = Instance.new("UICorner")
+
+			instances["UITextSizeConstraint15"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint15"].MaxTextSize = 18
+
+			instances["UIPadding38"] = Instance.new("UIPadding")
+			instances["UIPadding38"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding38"].PaddingRight = UDim.new(0, 6)
 
 			instances["UIPadding4"] = Instance.new("UIPadding")
 			instances["UIPadding4"].PaddingBottom = UDim.new(0, 10)
@@ -2551,9 +2545,9 @@ do
 			instances["TextBox4"]:AddTag("UIColor2")
 			instances["TextBox4"]:AddTag("UITransparency2")
 
-			instances["UICorner61"] = Instance.new("UICorner")
+			instances["UICorner62"] = Instance.new("UICorner")
 
-			instances["UICorner39"] = Instance.new("UICorner")
+			instances["UICorner40"] = Instance.new("UICorner")
 
 			instances["Label"] = Instance.new("TextLabel")
 			instances["Label"].Active = true
@@ -2570,17 +2564,17 @@ do
 			instances["Label"].TextXAlignment = Enum.TextXAlignment.Left
 			instances["Label"].ZIndex = 1e+06
 
-			instances["UIPadding38"] = Instance.new("UIPadding")
-			instances["UIPadding38"].PaddingBottom = UDim.new(0, 2)
-			instances["UIPadding38"].PaddingLeft = UDim.new(0, 8)
-			instances["UIPadding38"].PaddingRight = UDim.new(0, 2)
-			instances["UIPadding38"].PaddingTop = UDim.new(0, 2)
+			instances["UIPadding39"] = Instance.new("UIPadding")
+			instances["UIPadding39"].PaddingBottom = UDim.new(0, 2)
+			instances["UIPadding39"].PaddingLeft = UDim.new(0, 8)
+			instances["UIPadding39"].PaddingRight = UDim.new(0, 2)
+			instances["UIPadding39"].PaddingTop = UDim.new(0, 2)
 
-			instances["UIPadding25"] = Instance.new("UIPadding")
-			instances["UIPadding25"].PaddingBottom = UDim.new(0, 5)
-			instances["UIPadding25"].PaddingLeft = UDim.new(0, 5)
-			instances["UIPadding25"].PaddingRight = UDim.new(0, 5)
-			instances["UIPadding25"].PaddingTop = UDim.new(0, 5)
+			instances["UIPadding26"] = Instance.new("UIPadding")
+			instances["UIPadding26"].PaddingBottom = UDim.new(0, 5)
+			instances["UIPadding26"].PaddingLeft = UDim.new(0, 5)
+			instances["UIPadding26"].PaddingRight = UDim.new(0, 5)
+			instances["UIPadding26"].PaddingTop = UDim.new(0, 5)
 
 			instances["Information"] = Instance.new("Frame")
 			instances["Information"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
@@ -2612,18 +2606,18 @@ do
 			instances["UITextSizeConstraint7"] = Instance.new("UITextSizeConstraint")
 			instances["UITextSizeConstraint7"].MaxTextSize = 20
 
-			instances["UICorner40"] = Instance.new("UICorner")
+			instances["UICorner41"] = Instance.new("UICorner")
 
-			instances["UIPadding26"] = Instance.new("UIPadding")
-			instances["UIPadding26"].PaddingBottom = UDim.new(0, 6)
-			instances["UIPadding26"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding26"].PaddingRight = UDim.new(0, 6)
-			instances["UIPadding26"].PaddingTop = UDim.new(0, 6)
+			instances["UIPadding27"] = Instance.new("UIPadding")
+			instances["UIPadding27"].PaddingBottom = UDim.new(0, 6)
+			instances["UIPadding27"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding27"].PaddingRight = UDim.new(0, 6)
+			instances["UIPadding27"].PaddingTop = UDim.new(0, 6)
 
-			instances["UIListLayout8"] = Instance.new("UIListLayout")
-			instances["UIListLayout8"].HorizontalAlignment = Enum.HorizontalAlignment.Center
-			instances["UIListLayout8"].Padding = UDim.new(0, 5)
-			instances["UIListLayout8"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout9"] = Instance.new("UIListLayout")
+			instances["UIListLayout9"].HorizontalAlignment = Enum.HorizontalAlignment.Center
+			instances["UIListLayout9"].Padding = UDim.new(0, 5)
+			instances["UIListLayout9"].SortOrder = Enum.SortOrder.LayoutOrder
 
 			instances["Buttons2"] = Instance.new("Frame")
 			instances["Buttons2"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -2655,7 +2649,7 @@ do
 			instances["Confirm"]:AddTag("UIColor2")
 			instances["Confirm"]:AddTag("UITransparency2")
 
-			instances["UICorner62"] = Instance.new("UICorner")
+			instances["UICorner63"] = Instance.new("UICorner")
 
 			instances["Cancel"] = Instance.new("TextButton")
 			instances["Cancel"].AnchorPoint = Vector2.new(0.5, 0.5)
@@ -2677,20 +2671,20 @@ do
 			instances["Cancel"]:AddTag("UIColor2")
 			instances["Cancel"]:AddTag("UITransparency2")
 
-			instances["UICorner63"] = Instance.new("UICorner")
+			instances["UICorner64"] = Instance.new("UICorner")
 
-			instances["UIListLayout12"] = Instance.new("UIListLayout")
-			instances["UIListLayout12"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout12"].HorizontalAlignment = Enum.HorizontalAlignment.Center
-			instances["UIListLayout12"].Padding = UDim.new(0, 5)
-			instances["UIListLayout12"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout12"].VerticalAlignment = Enum.VerticalAlignment.Center
+			instances["UIListLayout13"] = Instance.new("UIListLayout")
+			instances["UIListLayout13"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout13"].HorizontalAlignment = Enum.HorizontalAlignment.Center
+			instances["UIListLayout13"].Padding = UDim.new(0, 5)
+			instances["UIListLayout13"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout13"].VerticalAlignment = Enum.VerticalAlignment.Center
 
-			instances["UIPadding27"] = Instance.new("UIPadding")
-			instances["UIPadding27"].PaddingBottom = UDim.new(0, 3)
-			instances["UIPadding27"].PaddingLeft = UDim.new(0, 3)
-			instances["UIPadding27"].PaddingRight = UDim.new(0, 3)
-			instances["UIPadding27"].PaddingTop = UDim.new(0, 3)
+			instances["UIPadding28"] = Instance.new("UIPadding")
+			instances["UIPadding28"].PaddingBottom = UDim.new(0, 3)
+			instances["UIPadding28"].PaddingLeft = UDim.new(0, 3)
+			instances["UIPadding28"].PaddingRight = UDim.new(0, 3)
+			instances["UIPadding28"].PaddingTop = UDim.new(0, 3)
 
 			instances["ColorSelectorContainer"] = Instance.new("Frame")
 			instances["ColorSelectorContainer"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -2703,18 +2697,18 @@ do
 			instances["ColorSelectorContainer"].Size = UDim2.new(1, 0, 0.123469, 126)
 			instances["ColorSelectorContainer"].ZIndex = 1e+06
 
-			instances["UIPadding28"] = Instance.new("UIPadding")
-			instances["UIPadding28"].PaddingBottom = UDim.new(0, 6)
-			instances["UIPadding28"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding28"].PaddingRight = UDim.new(0, 6)
-			instances["UIPadding28"].PaddingTop = UDim.new(0, 6)
+			instances["UIPadding29"] = Instance.new("UIPadding")
+			instances["UIPadding29"].PaddingBottom = UDim.new(0, 6)
+			instances["UIPadding29"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding29"].PaddingRight = UDim.new(0, 6)
+			instances["UIPadding29"].PaddingTop = UDim.new(0, 6)
 
-			instances["UIListLayout13"] = Instance.new("UIListLayout")
-			instances["UIListLayout13"].HorizontalAlignment = Enum.HorizontalAlignment.Center
-			instances["UIListLayout13"].Padding = UDim.new(0, 15)
-			instances["UIListLayout13"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout13"].VerticalAlignment = Enum.VerticalAlignment.Center
-			instances["UIListLayout13"].Wraps = true
+			instances["UIListLayout14"] = Instance.new("UIListLayout")
+			instances["UIListLayout14"].HorizontalAlignment = Enum.HorizontalAlignment.Center
+			instances["UIListLayout14"].Padding = UDim.new(0, 15)
+			instances["UIListLayout14"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout14"].VerticalAlignment = Enum.VerticalAlignment.Center
+			instances["UIListLayout14"].Wraps = true
 
 			instances["ResultFrame"] = Instance.new("Frame")
 			instances["ResultFrame"].AnchorPoint = Vector2.new(0.5, 0.5)
@@ -2732,7 +2726,7 @@ do
 			instances["UIStroke7"].Thickness = 3
 			instances["UIStroke7"].Transparency = 0.75
 
-			instances["UICorner64"] = Instance.new("UICorner")
+			instances["UICorner65"] = Instance.new("UICorner")
 
 			instances["OscuridadBar"] = Instance.new("ImageButton")
 			instances["OscuridadBar"].Active = false
@@ -2759,7 +2753,7 @@ do
 			instances["UIStroke8"].Thickness = 3
 			instances["UIStroke8"].Transparency = 0.75
 
-			instances["UICorner65"] = Instance.new("UICorner")
+			instances["UICorner66"] = Instance.new("UICorner")
 
 			instances["OscuridadBarSelect"] = Instance.new("TextButton")
 			instances["OscuridadBarSelect"].AnchorPoint = Vector2.new(0.5, 0.5)
@@ -2772,7 +2766,7 @@ do
 			instances["OscuridadBarSelect"].TextTransparency = 1
 			instances["OscuridadBarSelect"].ZIndex = 1e+06
 
-			instances["UICorner72"] = Instance.new("UICorner")
+			instances["UICorner74"] = Instance.new("UICorner")
 
 			instances["UIStroke10"] = Instance.new("UIStroke")
 			instances["UIStroke10"].ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -2795,8 +2789,8 @@ do
 			instances["PaletaColorImagen"].Size = UDim2.new(0.455389, 0, 1.34625, 0)
 			instances["PaletaColorImagen"].ZIndex = 1e+06
 
-			instances["UICorner66"] = Instance.new("UICorner")
-			instances["UICorner66"].CornerRadius = UDim.new(1, 0)
+			instances["UICorner67"] = Instance.new("UICorner")
+			instances["UICorner67"].CornerRadius = UDim.new(1, 0)
 
 			instances["UIAspectRatioConstraint31"] = Instance.new("UIAspectRatioConstraint")
 
@@ -2819,7 +2813,7 @@ do
 			instances["PaletaColorImagenSelect"].TextTransparency = 1
 			instances["PaletaColorImagenSelect"].ZIndex = 1e+06
 
-			instances["UICorner73"] = Instance.new("UICorner")
+			instances["UICorner75"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint33"] = Instance.new("UIAspectRatioConstraint")
 
@@ -2841,12 +2835,12 @@ do
 			instances["RecentColors"].Size = UDim2.new(0.50479, 0, 0.620095, 0)
 			instances["RecentColors"].ZIndex = 1e+06
 
-			instances["UIListLayout15"] = Instance.new("UIListLayout")
-			instances["UIListLayout15"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout15"].HorizontalAlignment = Enum.HorizontalAlignment.Center
-			instances["UIListLayout15"].Padding = UDim.new(0, 7)
-			instances["UIListLayout15"].SortOrder = Enum.SortOrder.LayoutOrder
-			instances["UIListLayout15"].Wraps = true
+			instances["UIListLayout17"] = Instance.new("UIListLayout")
+			instances["UIListLayout17"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout17"].HorizontalAlignment = Enum.HorizontalAlignment.Center
+			instances["UIListLayout17"].Padding = UDim.new(0, 7)
+			instances["UIListLayout17"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout17"].Wraps = true
 
 			instances["RecentColorTemplate"] = Instance.new("TextButton")
 			instances["RecentColorTemplate"].Active = false
@@ -2860,7 +2854,7 @@ do
 			instances["RecentColorTemplate"].TextTransparency = 1
 			instances["RecentColorTemplate"].ZIndex = 1e+06
 
-			instances["UICorner74"] = Instance.new("UICorner")
+			instances["UICorner76"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint34"] = Instance.new("UIAspectRatioConstraint")
 
@@ -2896,9 +2890,9 @@ do
 			instances["UIPadding14"].PaddingRight = UDim.new(0, 5)
 			instances["UIPadding14"].PaddingTop = UDim.new(0, 5)
 
-			instances["UIListLayout9"] = Instance.new("UIListLayout")
-			instances["UIListLayout9"].Padding = UDim.new(0, 5)
-			instances["UIListLayout9"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout10"] = Instance.new("UIListLayout")
+			instances["UIListLayout10"].Padding = UDim.new(0, 5)
+			instances["UIListLayout10"].SortOrder = Enum.SortOrder.LayoutOrder
 
 			instances["UISizeConstraint"] = Instance.new("UISizeConstraint")
 			instances["UISizeConstraint"].MaxSize = Vector2.new(math.huge, 150)
@@ -3093,7 +3087,6 @@ do
 			instances["TextLabel"].BorderColor3 = Color3.fromRGB(0, 0, 0)
 			instances["TextLabel"].BorderSizePixel = 0
 			instances["TextLabel"].ClearTextOnFocus = false
-			instances["TextLabel"].CursorPosition = -1
 			instances["TextLabel"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
 			instances["TextLabel"].Name = "TextLabel"
 			instances["TextLabel"].PlaceholderColor3 = Color3.fromRGB(178, 178, 178)
@@ -3127,6 +3120,100 @@ do
 
 			instances["UIStroke"] = Instance.new("UIStroke")
 
+			instances["MenuEmergentes"] = Instance.new("Frame")
+			instances["MenuEmergentes"].AnchorPoint = Vector2.new(0, 1)
+			instances["MenuEmergentes"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["MenuEmergentes"].BackgroundTransparency = 1
+			instances["MenuEmergentes"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+			instances["MenuEmergentes"].BorderSizePixel = 0
+			instances["MenuEmergentes"].Name = "MenuEmergentes"
+			instances["MenuEmergentes"].Position = UDim2.new(0, 0, 1, 0)
+			instances["MenuEmergentes"].Size = UDim2.new(1, -45, 1, -5)
+
+			instances["UIListLayout2"] = Instance.new("UIListLayout")
+			instances["UIListLayout2"].HorizontalAlignment = Enum.HorizontalAlignment.Right
+			instances["UIListLayout2"].Padding = UDim.new(0, 45)
+			instances["UIListLayout2"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout2"].Wraps = true
+
+			instances["MenuExample"] = Instance.new("Frame")
+			instances["MenuExample"].AnchorPoint = Vector2.new(0.5, 0.5)
+			instances["MenuExample"].BackgroundColor3 = Color3.fromRGB(255, 148, 148)
+			instances["MenuExample"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+			instances["MenuExample"].BorderSizePixel = 0
+			instances["MenuExample"].LayoutOrder = 2
+			instances["MenuExample"].Name = "MenuExample"
+			instances["MenuExample"].Position = UDim2.new(0.878828, 0, 0.343862, 0)
+			instances["MenuExample"].Size = UDim2.new(0, 250, 0, 250)
+			instances["MenuExample"].Visible = false
+			instances["MenuExample"].ZIndex = 1e+06
+			instances["MenuExample"]:AddTag("UIColor1")
+			instances["MenuExample"]:AddTag("UITransparency1")
+
+			instances["UICorner20"] = Instance.new("UICorner")
+
+			instances["UIPadding16"] = Instance.new("UIPadding")
+			instances["UIPadding16"].PaddingBottom = UDim.new(0, 6)
+			instances["UIPadding16"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding16"].PaddingRight = UDim.new(0, 6)
+			instances["UIPadding16"].PaddingTop = UDim.new(0, 6)
+
+			instances["ScrollingFrame6"] = Instance.new("ScrollingFrame")
+			instances["ScrollingFrame6"].Active = true
+			instances["ScrollingFrame6"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["ScrollingFrame6"].BackgroundTransparency = 1
+			instances["ScrollingFrame6"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+			instances["ScrollingFrame6"].BorderSizePixel = 0
+			instances["ScrollingFrame6"].HorizontalScrollBarInset = Enum.ScrollBarInset.Always
+			instances["ScrollingFrame6"].ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0)
+			instances["ScrollingFrame6"].ScrollBarImageTransparency = 0.5
+			instances["ScrollingFrame6"].Size = UDim2.new(1, 0, 1, 0)
+			instances["ScrollingFrame6"].ZIndex = 1e+07
+			instances["ScrollingFrame6"]:AddTag("BarColor")
+
+			instances["Information2"] = Instance.new("Frame")
+			instances["Information2"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
+			instances["Information2"].BackgroundTransparency = 0.8
+			instances["Information2"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+			instances["Information2"].BorderSizePixel = 0
+			instances["Information2"].LayoutOrder = 1
+			instances["Information2"].Name = "Information"
+			instances["Information2"].Size = UDim2.new(1, 0, 0, 30)
+			instances["Information2"].ZIndex = 1e+07
+			instances["Information2"]:AddTag("UIColor2")
+			instances["Information2"]:AddTag("UITransparency2")
+
+			instances["TextLabel8"] = Instance.new("TextLabel")
+			instances["TextLabel8"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			instances["TextLabel8"].BackgroundTransparency = 1
+			instances["TextLabel8"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+			instances["TextLabel8"].BorderSizePixel = 0
+			instances["TextLabel8"].FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			instances["TextLabel8"].Size = UDim2.new(1, 0, 1, 0)
+			instances["TextLabel8"].Text = "Color selector"
+			instances["TextLabel8"].TextColor3 = Color3.fromRGB(0, 0, 0)
+			instances["TextLabel8"].TextScaled = true
+			instances["TextLabel8"].TextSize = 14
+			instances["TextLabel8"].TextWrapped = true
+			instances["TextLabel8"].TextXAlignment = Enum.TextXAlignment.Left
+			instances["TextLabel8"].ZIndex = 1e+07
+
+			instances["UITextSizeConstraint16"] = Instance.new("UITextSizeConstraint")
+			instances["UITextSizeConstraint16"].MaxTextSize = 20
+
+			instances["UICorner68"] = Instance.new("UICorner")
+
+			instances["UIPadding40"] = Instance.new("UIPadding")
+			instances["UIPadding40"].PaddingBottom = UDim.new(0, 6)
+			instances["UIPadding40"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding40"].PaddingRight = UDim.new(0, 6)
+			instances["UIPadding40"].PaddingTop = UDim.new(0, 6)
+
+			instances["UIListLayout15"] = Instance.new("UIListLayout")
+			instances["UIListLayout15"].HorizontalAlignment = Enum.HorizontalAlignment.Center
+			instances["UIListLayout15"].Padding = UDim.new(0, 5)
+			instances["UIListLayout15"].SortOrder = Enum.SortOrder.LayoutOrder
+
 			instances["FastAccess"] = Instance.new("Frame")
 			instances["FastAccess"].Active = true
 			instances["FastAccess"].BackgroundColor3 = Color3.fromRGB(255, 148, 148)
@@ -3159,10 +3246,10 @@ do
 			instances["Buttons"]:AddTag("BarColor")
 			instances["Buttons"]:AddTag("BarTransparency")
 
-			instances["UIListLayout10"] = Instance.new("UIListLayout")
-			instances["UIListLayout10"].FillDirection = Enum.FillDirection.Horizontal
-			instances["UIListLayout10"].Padding = UDim.new(0, 6)
-			instances["UIListLayout10"].SortOrder = Enum.SortOrder.LayoutOrder
+			instances["UIListLayout11"] = Instance.new("UIListLayout")
+			instances["UIListLayout11"].FillDirection = Enum.FillDirection.Horizontal
+			instances["UIListLayout11"].Padding = UDim.new(0, 6)
+			instances["UIListLayout11"].SortOrder = Enum.SortOrder.LayoutOrder
 
 			instances["ExampleButton"] = Instance.new("TextButton")
 			instances["ExampleButton"].BackgroundColor3 = Color3.fromRGB(163, 75, 75)
@@ -3178,7 +3265,7 @@ do
 			instances["ExampleButton"]:AddTag("UIColor2")
 			instances["ExampleButton"]:AddTag("UITransparency2")
 
-			instances["UICorner41"] = Instance.new("UICorner")
+			instances["UICorner42"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint28"] = Instance.new("UIAspectRatioConstraint")
 
@@ -3194,7 +3281,7 @@ do
 			instances["ExampleTextBox"]:AddTag("UIColor2")
 			instances["ExampleTextBox"]:AddTag("UITransparency2")
 
-			instances["UICorner42"] = Instance.new("UICorner")
+			instances["UICorner43"] = Instance.new("UICorner")
 
 			instances["TextBox5"] = Instance.new("TextBox")
 			instances["TextBox5"].AnchorPoint = Vector2.new(1, 0)
@@ -3236,7 +3323,7 @@ do
 			instances["ExampleTextBox2"]:AddTag("UIColor2")
 			instances["ExampleTextBox2"]:AddTag("UITransparency2")
 
-			instances["UICorner67"] = Instance.new("UICorner")
+			instances["UICorner69"] = Instance.new("UICorner")
 
 			instances["UIAspectRatioConstraint29"] = Instance.new("UIAspectRatioConstraint")
 			instances["UIAspectRatioConstraint29"].AspectRatio = 2
@@ -3253,7 +3340,7 @@ do
 			instances["ExampleBoolean"]:AddTag("UIColor2")
 			instances["ExampleBoolean"]:AddTag("UITransparency2")
 
-			instances["UICorner43"] = Instance.new("UICorner")
+			instances["UICorner44"] = Instance.new("UICorner")
 
 			instances["TextLabel7"] = Instance.new("TextLabel")
 			instances["TextLabel7"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -3280,7 +3367,7 @@ do
 			instances["ExampleTextBox3"]:AddTag("UIColor2")
 			instances["ExampleTextBox3"]:AddTag("UITransparency2")
 
-			instances["UICorner68"] = Instance.new("UICorner")
+			instances["UICorner70"] = Instance.new("UICorner")
 
 			instances["TextButton"] = Instance.new("TextButton")
 			instances["TextButton"].AnchorPoint = Vector2.new(1, 0)
@@ -3300,34 +3387,46 @@ do
 			instances["UIAspectRatioConstraint30"] = Instance.new("UIAspectRatioConstraint")
 			instances["UIAspectRatioConstraint30"].AspectRatio = 2
 
-			instances["UIPadding16"] = Instance.new("UIPadding")
-			instances["UIPadding16"].PaddingBottom = UDim.new(0, 6)
-			instances["UIPadding16"].PaddingLeft = UDim.new(0, 6)
-			instances["UIPadding16"].PaddingRight = UDim.new(0, 6)
-			instances["UIPadding16"].PaddingTop = UDim.new(0, 6)
+			instances["UIPadding17"] = Instance.new("UIPadding")
+			instances["UIPadding17"].PaddingBottom = UDim.new(0, 6)
+			instances["UIPadding17"].PaddingLeft = UDim.new(0, 6)
+			instances["UIPadding17"].PaddingRight = UDim.new(0, 6)
+			instances["UIPadding17"].PaddingTop = UDim.new(0, 6)
 
-			instances["UIPadding16"].Parent = instances["Buttons"]
+			instances["UIPadding17"].Parent = instances["Buttons"]
 			instances["UIAspectRatioConstraint30"].Parent = instances["ExampleBoolean"]
 			instances["TextButton"].Parent = instances["ExampleBoolean"]
-			instances["UICorner68"].Parent = instances["ExampleTextBox3"]
+			instances["UICorner70"].Parent = instances["ExampleTextBox3"]
 			instances["ExampleTextBox3"].Parent = instances["ExampleBoolean"]
 			instances["TextLabel7"].Parent = instances["ExampleBoolean"]
-			instances["UICorner43"].Parent = instances["ExampleBoolean"]
+			instances["UICorner44"].Parent = instances["ExampleBoolean"]
 			instances["ExampleBoolean"].Parent = instances["Buttons"]
 			instances["UIAspectRatioConstraint29"].Parent = instances["ExampleTextBox"]
-			instances["UICorner67"].Parent = instances["ExampleTextBox2"]
+			instances["UICorner69"].Parent = instances["ExampleTextBox2"]
 			instances["ExampleTextBox2"].Parent = instances["ExampleTextBox"]
 			instances["TextLabel6"].Parent = instances["ExampleTextBox"]
 			instances["TextBox5"].Parent = instances["ExampleTextBox"]
-			instances["UICorner42"].Parent = instances["ExampleTextBox"]
+			instances["UICorner43"].Parent = instances["ExampleTextBox"]
 			instances["ExampleTextBox"].Parent = instances["Buttons"]
 			instances["UIAspectRatioConstraint28"].Parent = instances["ExampleButton"]
-			instances["UICorner41"].Parent = instances["ExampleButton"]
+			instances["UICorner42"].Parent = instances["ExampleButton"]
 			instances["ExampleButton"].Parent = instances["Buttons"]
-			instances["UIListLayout10"].Parent = instances["Buttons"]
+			instances["UIListLayout11"].Parent = instances["Buttons"]
 			instances["Buttons"].Parent = instances["FastAccess"]
 			instances["UICorner7"].Parent = instances["FastAccess"]
 			instances["FastAccess"].Parent = instances["ScreenGui"]
+			instances["UIListLayout15"].Parent = instances["ScrollingFrame6"]
+			instances["UIPadding40"].Parent = instances["Information2"]
+			instances["UICorner68"].Parent = instances["Information2"]
+			instances["UITextSizeConstraint16"].Parent = instances["TextLabel8"]
+			instances["TextLabel8"].Parent = instances["Information2"]
+			instances["Information2"].Parent = instances["ScrollingFrame6"]
+			instances["ScrollingFrame6"].Parent = instances["MenuExample"]
+			instances["UIPadding16"].Parent = instances["MenuExample"]
+			instances["UICorner20"].Parent = instances["MenuExample"]
+			instances["MenuExample"].Parent = instances["MenuEmergentes"]
+			instances["UIListLayout2"].Parent = instances["MenuEmergentes"]
+			instances["MenuEmergentes"].Parent = instances["ScreenGui"]
 			instances["UIStroke"].Parent = instances["ExtraInformation"]
 			instances["ExtraInformation"].Parent = instances["ScreenGui"]
 			instances["UIStroke3"].Parent = instances["TextLabel"]
@@ -3356,54 +3455,54 @@ do
 			instances["UICorner14"].Parent = instances["MinimizeExample"]
 			instances["MinimizeExample"].Parent = instances["Examples"]
 			instances["UISizeConstraint"].Parent = instances["ScrollingFrameExampleToFuncs"]
-			instances["UIListLayout9"].Parent = instances["ScrollingFrameExampleToFuncs"]
+			instances["UIListLayout10"].Parent = instances["ScrollingFrameExampleToFuncs"]
 			instances["UIPadding14"].Parent = instances["ScrollingFrameExampleToFuncs"]
 			instances["ScrollingFrameExampleToFuncs"].Parent = instances["Examples"]
 			instances["UIStroke12"].Parent = instances["RecentColorTemplate"]
 			instances["UIAspectRatioConstraint34"].Parent = instances["RecentColorTemplate"]
-			instances["UICorner74"].Parent = instances["RecentColorTemplate"]
+			instances["UICorner76"].Parent = instances["RecentColorTemplate"]
 			instances["RecentColorTemplate"].Parent = instances["RecentColors"]
-			instances["UIListLayout15"].Parent = instances["RecentColors"]
+			instances["UIListLayout17"].Parent = instances["RecentColors"]
 			instances["RecentColors"].Parent = instances["ColorSelectorContainer"]
 			instances["UIStroke11"].Parent = instances["PaletaColorImagenSelect"]
 			instances["UIAspectRatioConstraint33"].Parent = instances["PaletaColorImagenSelect"]
-			instances["UICorner73"].Parent = instances["PaletaColorImagenSelect"]
+			instances["UICorner75"].Parent = instances["PaletaColorImagenSelect"]
 			instances["PaletaColorImagenSelect"].Parent = instances["PaletaColorImagen"]
 			instances["UIStroke9"].Parent = instances["PaletaColorImagen"]
 			instances["UIAspectRatioConstraint31"].Parent = instances["PaletaColorImagen"]
-			instances["UICorner66"].Parent = instances["PaletaColorImagen"]
+			instances["UICorner67"].Parent = instances["PaletaColorImagen"]
 			instances["PaletaColorImagen"].Parent = instances["ColorSelectorContainer"]
 			instances["UIStroke10"].Parent = instances["OscuridadBarSelect"]
-			instances["UICorner72"].Parent = instances["OscuridadBarSelect"]
+			instances["UICorner74"].Parent = instances["OscuridadBarSelect"]
 			instances["OscuridadBarSelect"].Parent = instances["OscuridadBar"]
-			instances["UICorner65"].Parent = instances["OscuridadBar"]
+			instances["UICorner66"].Parent = instances["OscuridadBar"]
 			instances["UIStroke8"].Parent = instances["OscuridadBar"]
 			instances["UIGradient2"].Parent = instances["OscuridadBar"]
 			instances["OscuridadBar"].Parent = instances["ColorSelectorContainer"]
-			instances["UICorner64"].Parent = instances["ResultFrame"]
+			instances["UICorner65"].Parent = instances["ResultFrame"]
 			instances["UIStroke7"].Parent = instances["ResultFrame"]
 			instances["ResultFrame"].Parent = instances["ColorSelectorContainer"]
-			instances["UIListLayout13"].Parent = instances["ColorSelectorContainer"]
-			instances["UIPadding28"].Parent = instances["ColorSelectorContainer"]
+			instances["UIListLayout14"].Parent = instances["ColorSelectorContainer"]
+			instances["UIPadding29"].Parent = instances["ColorSelectorContainer"]
 			instances["ColorSelectorContainer"].Parent = instances["ColorSelector2"]
-			instances["UIPadding27"].Parent = instances["Buttons2"]
-			instances["UIListLayout12"].Parent = instances["Buttons2"]
-			instances["UICorner63"].Parent = instances["Cancel"]
+			instances["UIPadding28"].Parent = instances["Buttons2"]
+			instances["UIListLayout13"].Parent = instances["Buttons2"]
+			instances["UICorner64"].Parent = instances["Cancel"]
 			instances["Cancel"].Parent = instances["Buttons2"]
-			instances["UICorner62"].Parent = instances["Confirm"]
+			instances["UICorner63"].Parent = instances["Confirm"]
 			instances["Confirm"].Parent = instances["Buttons2"]
 			instances["Buttons2"].Parent = instances["ColorSelector2"]
-			instances["UIListLayout8"].Parent = instances["ColorSelector2"]
-			instances["UIPadding26"].Parent = instances["Information"]
-			instances["UICorner40"].Parent = instances["Information"]
+			instances["UIListLayout9"].Parent = instances["ColorSelector2"]
+			instances["UIPadding27"].Parent = instances["Information"]
+			instances["UICorner41"].Parent = instances["Information"]
 			instances["UITextSizeConstraint7"].Parent = instances["TextLabel5"]
 			instances["TextLabel5"].Parent = instances["Information"]
 			instances["Information"].Parent = instances["ColorSelector2"]
-			instances["UIPadding25"].Parent = instances["Hex"]
-			instances["UIPadding38"].Parent = instances["Label"]
+			instances["UIPadding26"].Parent = instances["Hex"]
+			instances["UIPadding39"].Parent = instances["Label"]
 			instances["Label"].Parent = instances["Hex"]
-			instances["UICorner39"].Parent = instances["Hex"]
-			instances["UICorner61"].Parent = instances["TextBox4"]
+			instances["UICorner40"].Parent = instances["Hex"]
+			instances["UICorner62"].Parent = instances["TextBox4"]
 			instances["TextBox4"].Parent = instances["Hex"]
 			instances["Hex"].Parent = instances["ColorSelector2"]
 			instances["UIPadding13"].Parent = instances["ColorSelector2"]
@@ -3414,146 +3513,146 @@ do
 			instances["UIListLayout"].Parent = instances["NotificationFrame"]
 			instances["NotificationFrame"].Parent = instances["ScreenGui"]
 			instances["UIPadding4"].Parent = instances["settingsmenu"]
-			instances["UIPadding37"].Parent = instances["TextBoxExample"]
-			instances["UICorner89"].Parent = instances["TextBox6"]
-			instances["TextBox6"].Parent = instances["Folder7"]
-			instances["UIListLayout22"].Parent = instances["Folder7"]
-			instances["Folder7"].Parent = instances["TextBoxExample"]
-			instances["UICorner60"].Parent = instances["TextBoxExample"]
-			instances["UIPadding47"].Parent = instances["Label9"]
+			instances["UIPadding38"].Parent = instances["TextExample"]
 			instances["UITextSizeConstraint15"].Parent = instances["Label9"]
-			instances["Label9"].Parent = instances["TextBoxExample"]
-			instances["TextBoxExample"].Parent = instances["ExampleConfigurationPage"]
-			instances["UIPadding36"].Parent = instances["ButtonExample"]
-			instances["UICorner88"].Parent = instances["Button"]
-			instances["UITextSizeConstraint26"].Parent = instances["Value3"]
-			instances["UIPadding51"].Parent = instances["Value3"]
-			instances["Value3"].Parent = instances["Button"]
-			instances["Button"].Parent = instances["Folder6"]
-			instances["UIListLayout21"].Parent = instances["Folder6"]
-			instances["Folder6"].Parent = instances["ButtonExample"]
-			instances["UICorner59"].Parent = instances["ButtonExample"]
-			instances["UIPadding46"].Parent = instances["Label8"]
+			instances["UICorner73"].Parent = instances["Label9"]
+			instances["UIPadding49"].Parent = instances["Label9"]
+			instances["Label9"].Parent = instances["TextExample"]
+			instances["UICorner61"].Parent = instances["TextExample"]
+			instances["TextExample"].Parent = instances["ExampleConfigurationPage"]
+			instances["UIPadding37"].Parent = instances["SliderExample"]
+			instances["Select"].Parent = instances["Slider"]
+			instances["Slider"].Parent = instances["Folder7"]
+			instances["UICorner91"].Parent = instances["Count"]
+			instances["UITextSizeConstraint24"].Parent = instances["Count"]
+			instances["Count"].Parent = instances["Folder7"]
+			instances["UIListLayout24"].Parent = instances["Folder7"]
+			instances["Folder7"].Parent = instances["SliderExample"]
+			instances["UICorner60"].Parent = instances["SliderExample"]
 			instances["UITextSizeConstraint14"].Parent = instances["Label8"]
-			instances["Label8"].Parent = instances["ButtonExample"]
-			instances["ButtonExample"].Parent = instances["ExampleConfigurationPage"]
+			instances["UIPadding48"].Parent = instances["Label8"]
+			instances["Label8"].Parent = instances["SliderExample"]
+			instances["SliderExample"].Parent = instances["ExampleConfigurationPage"]
+			instances["UIPadding36"].Parent = instances["ControlExample"]
+			instances["UIAspectRatioConstraint41"].Parent = instances["FirstControl"]
+			instances["UICorner90"].Parent = instances["FirstControl"]
+			instances["UITextSizeConstraint23"].Parent = instances["FirstControl"]
+			instances["FirstControl"].Parent = instances["Folder6"]
+			instances["UIAspectRatioConstraint40"].Parent = instances["SecondControl"]
+			instances["UICorner89"].Parent = instances["SecondControl"]
+			instances["UITextSizeConstraint22"].Parent = instances["SecondControl"]
+			instances["SecondControl"].Parent = instances["Folder6"]
+			instances["UIAspectRatioConstraint39"].Parent = instances["ThirdControl"]
+			instances["UICorner88"].Parent = instances["ThirdControl"]
+			instances["UITextSizeConstraint21"].Parent = instances["ThirdControl"]
+			instances["ThirdControl"].Parent = instances["Folder6"]
+			instances["UIListLayout23"].Parent = instances["Folder6"]
+			instances["Folder6"].Parent = instances["ControlExample"]
+			instances["UICorner59"].Parent = instances["ControlExample"]
+			instances["UITextSizeConstraint13"].Parent = instances["Label7"]
+			instances["UIPadding47"].Parent = instances["Label7"]
+			instances["Label7"].Parent = instances["ControlExample"]
+			instances["ControlExample"].Parent = instances["ExampleConfigurationPage"]
 			instances["UIPadding35"].Parent = instances["Color3Example"]
 			instances["UIStroke14"].Parent = instances["Color"]
-			instances["UIAspectRatioConstraint41"].Parent = instances["Color"]
+			instances["UIAspectRatioConstraint38"].Parent = instances["Color"]
 			instances["UICorner87"].Parent = instances["Color"]
 			instances["Color"].Parent = instances["Folder5"]
-			instances["UIListLayout20"].Parent = instances["Folder5"]
+			instances["UIListLayout22"].Parent = instances["Folder5"]
 			instances["Folder5"].Parent = instances["Color3Example"]
 			instances["UICorner58"].Parent = instances["Color3Example"]
-			instances["UITextSizeConstraint13"].Parent = instances["Label7"]
-			instances["UIPadding45"].Parent = instances["Label7"]
-			instances["Label7"].Parent = instances["Color3Example"]
-			instances["Color3Example"].Parent = instances["ExampleConfigurationPage"]
-			instances["UIPadding34"].Parent = instances["ControlExample"]
-			instances["UIAspectRatioConstraint40"].Parent = instances["FirstControl"]
-			instances["UICorner86"].Parent = instances["FirstControl"]
-			instances["UITextSizeConstraint23"].Parent = instances["FirstControl"]
-			instances["FirstControl"].Parent = instances["Folder4"]
-			instances["UIAspectRatioConstraint39"].Parent = instances["SecondControl"]
-			instances["UICorner85"].Parent = instances["SecondControl"]
-			instances["UITextSizeConstraint22"].Parent = instances["SecondControl"]
-			instances["SecondControl"].Parent = instances["Folder4"]
-			instances["UIAspectRatioConstraint38"].Parent = instances["ThirdControl"]
-			instances["UICorner84"].Parent = instances["ThirdControl"]
-			instances["UITextSizeConstraint21"].Parent = instances["ThirdControl"]
-			instances["ThirdControl"].Parent = instances["Folder4"]
-			instances["UIListLayout19"].Parent = instances["Folder4"]
-			instances["Folder4"].Parent = instances["ControlExample"]
-			instances["UICorner57"].Parent = instances["ControlExample"]
 			instances["UITextSizeConstraint12"].Parent = instances["Label6"]
-			instances["UIPadding44"].Parent = instances["Label6"]
-			instances["Label6"].Parent = instances["ControlExample"]
-			instances["ControlExample"].Parent = instances["ExampleConfigurationPage"]
-			instances["UIPadding33"].Parent = instances["SliderExample"]
-			instances["Select"].Parent = instances["Slider"]
-			instances["Slider"].Parent = instances["Folder3"]
-			instances["UICorner83"].Parent = instances["Count"]
-			instances["UITextSizeConstraint20"].Parent = instances["Count"]
-			instances["Count"].Parent = instances["Folder3"]
-			instances["UIListLayout18"].Parent = instances["Folder3"]
-			instances["Folder3"].Parent = instances["SliderExample"]
-			instances["UICorner56"].Parent = instances["SliderExample"]
+			instances["UIPadding46"].Parent = instances["Label6"]
+			instances["Label6"].Parent = instances["Color3Example"]
+			instances["Color3Example"].Parent = instances["ExampleConfigurationPage"]
+			instances["UIPadding34"].Parent = instances["ButtonExample"]
+			instances["UICorner86"].Parent = instances["Button"]
+			instances["UITextSizeConstraint27"].Parent = instances["Value3"]
+			instances["UIPadding53"].Parent = instances["Value3"]
+			instances["Value3"].Parent = instances["Button"]
+			instances["Button"].Parent = instances["Folder4"]
+			instances["UIListLayout21"].Parent = instances["Folder4"]
+			instances["Folder4"].Parent = instances["ButtonExample"]
+			instances["UICorner57"].Parent = instances["ButtonExample"]
+			instances["UIPadding45"].Parent = instances["Label5"]
 			instances["UITextSizeConstraint11"].Parent = instances["Label5"]
-			instances["UIPadding43"].Parent = instances["Label5"]
-			instances["Label5"].Parent = instances["SliderExample"]
-			instances["SliderExample"].Parent = instances["ExampleConfigurationPage"]
-			instances["UIPadding32"].Parent = instances["Vector3Example"]
-			instances["UIAspectRatioConstraint37"].Parent = instances["Z"]
-			instances["UICorner82"].Parent = instances["Z"]
-			instances["UITextSizeConstraint19"].Parent = instances["Z"]
-			instances["Z"].Parent = instances["Folder2"]
-			instances["UIAspectRatioConstraint36"].Parent = instances["Y"]
-			instances["UICorner81"].Parent = instances["Y"]
-			instances["UITextSizeConstraint18"].Parent = instances["Y"]
-			instances["Y"].Parent = instances["Folder2"]
-			instances["UIAspectRatioConstraint35"].Parent = instances["X"]
-			instances["UICorner80"].Parent = instances["X"]
-			instances["UITextSizeConstraint17"].Parent = instances["X"]
-			instances["X"].Parent = instances["Folder2"]
-			instances["UIListLayout17"].Parent = instances["Folder2"]
-			instances["Folder2"].Parent = instances["Vector3Example"]
-			instances["UICorner55"].Parent = instances["Vector3Example"]
+			instances["Label5"].Parent = instances["ButtonExample"]
+			instances["ButtonExample"].Parent = instances["ExampleConfigurationPage"]
+			instances["UIPadding33"].Parent = instances["TextBoxExample"]
+			instances["UICorner85"].Parent = instances["TextBox6"]
+			instances["TextBox6"].Parent = instances["Folder3"]
+			instances["UIListLayout20"].Parent = instances["Folder3"]
+			instances["Folder3"].Parent = instances["TextBoxExample"]
+			instances["UICorner56"].Parent = instances["TextBoxExample"]
+			instances["UIPadding44"].Parent = instances["Label4"]
 			instances["UITextSizeConstraint10"].Parent = instances["Label4"]
-			instances["UIPadding42"].Parent = instances["Label4"]
-			instances["Label4"].Parent = instances["Vector3Example"]
-			instances["Vector3Example"].Parent = instances["ExampleConfigurationPage"]
-			instances["UIPadding31"].Parent = instances["BooleanExample"]
-			instances["UIListLayout16"].Parent = instances["Folder"]
-			instances["UICorner79"].Parent = instances["On"]
-			instances["UITextSizeConstraint25"].Parent = instances["Value2"]
-			instances["UIPadding50"].Parent = instances["Value2"]
-			instances["Value2"].Parent = instances["On"]
-			instances["On"].Parent = instances["Folder"]
-			instances["UICorner78"].Parent = instances["Off"]
-			instances["UIPadding49"].Parent = instances["Value"]
-			instances["UITextSizeConstraint24"].Parent = instances["Value"]
-			instances["Value"].Parent = instances["Off"]
-			instances["Off"].Parent = instances["Folder"]
-			instances["Folder"].Parent = instances["BooleanExample"]
-			instances["UICorner54"].Parent = instances["BooleanExample"]
-			instances["UIPadding41"].Parent = instances["Label3"]
-			instances["UITextSizeConstraint9"].Parent = instances["Label3"]
-			instances["Label3"].Parent = instances["BooleanExample"]
-			instances["BooleanExample"].Parent = instances["ExampleConfigurationPage"]
-			instances["UIPadding40"].Parent = instances["VisibleUI"]
-			instances["UICorner71"].Parent = instances["VisibleUI"]
-			instances["UITextSizeConstraint16"].Parent = instances["Label10"]
-			instances["UICorner77"].Parent = instances["Label10"]
-			instances["UIPadding48"].Parent = instances["Label10"]
+			instances["Label4"].Parent = instances["TextBoxExample"]
+			instances["TextBoxExample"].Parent = instances["ExampleConfigurationPage"]
+			instances["UIPadding43"].Parent = instances["VisibleUI"]
+			instances["UICorner72"].Parent = instances["VisibleUI"]
+			instances["UITextSizeConstraint20"].Parent = instances["Label10"]
+			instances["UICorner84"].Parent = instances["Label10"]
+			instances["UIPadding50"].Parent = instances["Label10"]
 			instances["Label10"].Parent = instances["VisibleUI"]
 			instances["VisibleUI"].Parent = instances["SeparatorExample"]
 			instances["SeparatorExample"].Parent = instances["ExampleConfigurationPage"]
-			instances["UIPadding30"].Parent = instances["TextExample"]
+			instances["UIPadding32"].Parent = instances["BooleanExample"]
+			instances["UIListLayout19"].Parent = instances["Folder2"]
+			instances["UICorner83"].Parent = instances["On"]
+			instances["UITextSizeConstraint26"].Parent = instances["Value2"]
+			instances["UIPadding52"].Parent = instances["Value2"]
+			instances["Value2"].Parent = instances["On"]
+			instances["On"].Parent = instances["Folder2"]
+			instances["UICorner82"].Parent = instances["Off"]
+			instances["UIPadding51"].Parent = instances["Value"]
+			instances["UITextSizeConstraint25"].Parent = instances["Value"]
+			instances["Value"].Parent = instances["Off"]
+			instances["Off"].Parent = instances["Folder2"]
+			instances["Folder2"].Parent = instances["BooleanExample"]
+			instances["UICorner55"].Parent = instances["BooleanExample"]
+			instances["UIPadding42"].Parent = instances["Label3"]
+			instances["UITextSizeConstraint9"].Parent = instances["Label3"]
+			instances["Label3"].Parent = instances["BooleanExample"]
+			instances["BooleanExample"].Parent = instances["ExampleConfigurationPage"]
+			instances["UIPadding31"].Parent = instances["Vector3Example"]
+			instances["UIAspectRatioConstraint37"].Parent = instances["Z"]
+			instances["UICorner81"].Parent = instances["Z"]
+			instances["UITextSizeConstraint19"].Parent = instances["Z"]
+			instances["Z"].Parent = instances["Folder"]
+			instances["UIAspectRatioConstraint36"].Parent = instances["Y"]
+			instances["UICorner80"].Parent = instances["Y"]
+			instances["UITextSizeConstraint18"].Parent = instances["Y"]
+			instances["Y"].Parent = instances["Folder"]
+			instances["UIAspectRatioConstraint35"].Parent = instances["X"]
+			instances["UICorner79"].Parent = instances["X"]
+			instances["UITextSizeConstraint17"].Parent = instances["X"]
+			instances["X"].Parent = instances["Folder"]
+			instances["UIListLayout18"].Parent = instances["Folder"]
+			instances["Folder"].Parent = instances["Vector3Example"]
+			instances["UICorner54"].Parent = instances["Vector3Example"]
 			instances["UITextSizeConstraint8"].Parent = instances["Label2"]
-			instances["UICorner70"].Parent = instances["Label2"]
-			instances["UIPadding39"].Parent = instances["Label2"]
-			instances["Label2"].Parent = instances["TextExample"]
-			instances["UICorner53"].Parent = instances["TextExample"]
-			instances["TextExample"].Parent = instances["ExampleConfigurationPage"]
-			instances["UIPadding24"].Parent = instances["ExampleConfigurationPage"]
-			instances["UIListLayout11"].Parent = instances["ExampleConfigurationPage"]
+			instances["UIPadding41"].Parent = instances["Label2"]
+			instances["Label2"].Parent = instances["Vector3Example"]
+			instances["Vector3Example"].Parent = instances["ExampleConfigurationPage"]
+			instances["UIPadding25"].Parent = instances["ExampleConfigurationPage"]
+			instances["UIListLayout12"].Parent = instances["ExampleConfigurationPage"]
 			instances["UIGradient"].Parent = instances["ExampleConfigurationPage"]
 			instances["ExampleConfigurationPage"].Parent = instances["SettingsPages"]
 			instances["UIPadding12"].Parent = instances["SettingsPages"]
 			instances["SettingsPages"].Parent = instances["settingsmenu"]
-			instances["UICorner38"].Parent = instances["ExampleTab"]
-			instances["UIPadding23"].Parent = instances["ExampleTab"]
+			instances["UICorner39"].Parent = instances["ExampleTab"]
+			instances["UIPadding24"].Parent = instances["ExampleTab"]
 			instances["ExampleTab"].Parent = instances["Tabs"]
-			instances["UIListLayout7"].Parent = instances["Tabs"]
+			instances["UIListLayout8"].Parent = instances["Tabs"]
 			instances["Tabs"].Parent = instances["settingsmenu"]
 			instances["UICorner6"].Parent = instances["settingsmenu"]
 			instances["settingsmenu"].Parent = instances["ScreenGui"]
 			instances["UIAspectRatioConstraint27"].Parent = instances["ImageLabel3"]
 			instances["UITextSizeConstraint6"].Parent = instances["ImageLabel3"]
-			instances["UIPadding22"].Parent = instances["ImageLabel3"]
+			instances["UIPadding23"].Parent = instances["ImageLabel3"]
 			instances["ImageLabel3"].Parent = instances["Searcher3"]
 			instances["UITextSizeConstraint5"].Parent = instances["TextBox3"]
-			instances["UIPadding21"].Parent = instances["TextBox3"]
+			instances["UIPadding22"].Parent = instances["TextBox3"]
 			instances["TextBox3"].Parent = instances["Searcher3"]
 			instances["UICorner12"].Parent = instances["Searcher3"]
 			instances["UIPadding11"].Parent = instances["Searcher3"]
@@ -3563,114 +3662,114 @@ do
 			instances["UICorner11"].Parent = instances["ColorSelector"]
 			instances["ColorSelector"].Parent = instances["colormenu"]
 			instances["UIStroke6"].Parent = instances["TextLabel4"]
-			instances["UICorner52"].Parent = instances["TextLabel4"]
+			instances["UICorner53"].Parent = instances["TextLabel4"]
 			instances["TextLabel4"].Parent = instances["ExampleMaterialButton2"]
 			instances["UIAspectRatioConstraint26"].Parent = instances["ExampleMaterialButton2"]
 			instances["Part5"].Parent = instances["Part2"]
 			instances["Part2"].Parent = instances["Frame6"]
 			instances["Camera4"].Parent = instances["Frame6"]
-			instances["UICorner51"].Parent = instances["Frame6"]
+			instances["UICorner52"].Parent = instances["Frame6"]
 			instances["Frame6"].Parent = instances["ExampleMaterialButton2"]
-			instances["UICorner37"].Parent = instances["ExampleMaterialButton2"]
+			instances["UICorner38"].Parent = instances["ExampleMaterialButton2"]
 			instances["ExampleMaterialButton2"].Parent = instances["ScrollingFrame5"]
-			instances["UIListLayout6"].Parent = instances["ScrollingFrame5"]
+			instances["UIListLayout7"].Parent = instances["ScrollingFrame5"]
 			instances["ScrollingFrame5"].Parent = instances["colormenu"]
 			instances["UICorner5"].Parent = instances["colormenu"]
 			instances["UIPadding3"].Parent = instances["colormenu"]
 			instances["colormenu"].Parent = instances["ScreenGui"]
 			instances["UIAspectRatioConstraint25"].Parent = instances["ImageLabel2"]
 			instances["UITextSizeConstraint4"].Parent = instances["ImageLabel2"]
-			instances["UIPadding20"].Parent = instances["ImageLabel2"]
+			instances["UIPadding21"].Parent = instances["ImageLabel2"]
 			instances["ImageLabel2"].Parent = instances["Searcher2"]
 			instances["UITextSizeConstraint3"].Parent = instances["TextBox2"]
-			instances["UIPadding19"].Parent = instances["TextBox2"]
+			instances["UIPadding20"].Parent = instances["TextBox2"]
 			instances["TextBox2"].Parent = instances["Searcher2"]
 			instances["UICorner10"].Parent = instances["Searcher2"]
 			instances["UIPadding10"].Parent = instances["Searcher2"]
 			instances["Searcher2"].Parent = instances["materialmenu"]
 			instances["UIStroke5"].Parent = instances["TextLabel3"]
-			instances["UICorner50"].Parent = instances["TextLabel3"]
+			instances["UICorner51"].Parent = instances["TextLabel3"]
 			instances["TextLabel3"].Parent = instances["ExampleMaterialButton"]
 			instances["UIAspectRatioConstraint24"].Parent = instances["ExampleMaterialButton"]
 			instances["Part4"].Parent = instances["Part"]
 			instances["Part"].Parent = instances["Frame5"]
 			instances["Camera3"].Parent = instances["Frame5"]
-			instances["UICorner49"].Parent = instances["Frame5"]
+			instances["UICorner50"].Parent = instances["Frame5"]
 			instances["Frame5"].Parent = instances["ExampleMaterialButton"]
-			instances["UICorner36"].Parent = instances["ExampleMaterialButton"]
+			instances["UICorner37"].Parent = instances["ExampleMaterialButton"]
 			instances["ExampleMaterialButton"].Parent = instances["ScrollingFrame4"]
-			instances["UIListLayout5"].Parent = instances["ScrollingFrame4"]
+			instances["UIListLayout6"].Parent = instances["ScrollingFrame4"]
 			instances["ScrollingFrame4"].Parent = instances["materialmenu"]
 			instances["UICorner4"].Parent = instances["materialmenu"]
 			instances["UIPadding2"].Parent = instances["materialmenu"]
 			instances["materialmenu"].Parent = instances["ScreenGui"]
 			instances["UIPadding9"].Parent = instances["ScrollingFrame3"]
 			instances["UIAspectRatioConstraint23"].Parent = instances["none"]
-			instances["UICorner35"].Parent = instances["none"]
+			instances["UICorner36"].Parent = instances["none"]
 			instances["none"].Parent = instances["ScrollingFrame3"]
 			instances["UIAspectRatioConstraint22"].Parent = instances["rote"]
-			instances["UICorner34"].Parent = instances["rote"]
+			instances["UICorner35"].Parent = instances["rote"]
 			instances["rote"].Parent = instances["ScrollingFrame3"]
 			instances["UIAspectRatioConstraint21"].Parent = instances["resize"]
-			instances["UICorner33"].Parent = instances["resize"]
+			instances["UICorner34"].Parent = instances["resize"]
 			instances["resize"].Parent = instances["ScrollingFrame3"]
 			instances["UIAspectRatioConstraint20"].Parent = instances["recolor"]
-			instances["UICorner32"].Parent = instances["recolor"]
+			instances["UICorner33"].Parent = instances["recolor"]
 			instances["recolor"].Parent = instances["ScrollingFrame3"]
 			instances["UIAspectRatioConstraint19"].Parent = instances["position"]
-			instances["UICorner31"].Parent = instances["position"]
+			instances["UICorner32"].Parent = instances["position"]
 			instances["position"].Parent = instances["ScrollingFrame3"]
 			instances["UIAspectRatioConstraint18"].Parent = instances["selection"]
-			instances["UICorner30"].Parent = instances["selection"]
+			instances["UICorner31"].Parent = instances["selection"]
 			instances["selection"].Parent = instances["ScrollingFrame3"]
 			instances["UIAspectRatioConstraint17"].Parent = instances["destroy"]
-			instances["UICorner29"].Parent = instances["destroy"]
+			instances["UICorner30"].Parent = instances["destroy"]
 			instances["destroy"].Parent = instances["ScrollingFrame3"]
 			instances["UIAspectRatioConstraint16"].Parent = instances["copycolor"]
-			instances["UICorner28"].Parent = instances["copycolor"]
+			instances["UICorner29"].Parent = instances["copycolor"]
 			instances["copycolor"].Parent = instances["ScrollingFrame3"]
 			instances["UIAspectRatioConstraint15"].Parent = instances["add"]
-			instances["UICorner27"].Parent = instances["add"]
+			instances["UICorner28"].Parent = instances["add"]
 			instances["add"].Parent = instances["ScrollingFrame3"]
 			instances["UICorner9"].Parent = instances["ScrollingFrame3"]
-			instances["UIListLayout4"].Parent = instances["ScrollingFrame3"]
+			instances["UIListLayout5"].Parent = instances["ScrollingFrame3"]
 			instances["ScrollingFrame3"].Parent = instances["toolsmenu"]
 			instances["UICorner3"].Parent = instances["toolsmenu"]
 			instances["toolsmenu"].Parent = instances["ScreenGui"]
 			instances["UIAspectRatioConstraint14"].Parent = instances["ImageLabel"]
 			instances["UITextSizeConstraint2"].Parent = instances["ImageLabel"]
-			instances["UIPadding18"].Parent = instances["ImageLabel"]
+			instances["UIPadding19"].Parent = instances["ImageLabel"]
 			instances["ImageLabel"].Parent = instances["Searcher"]
 			instances["UITextSizeConstraint"].Parent = instances["TextBox"]
-			instances["UIPadding17"].Parent = instances["TextBox"]
+			instances["UIPadding18"].Parent = instances["TextBox"]
 			instances["TextBox"].Parent = instances["Searcher"]
 			instances["UICorner8"].Parent = instances["Searcher"]
 			instances["UIPadding8"].Parent = instances["Searcher"]
 			instances["Searcher"].Parent = instances["objectsmenu"]
 			instances["UIPadding7"].Parent = instances["ScrollingFrame2"]
 			instances["UIStroke4"].Parent = instances["TextLabel2"]
-			instances["UICorner48"].Parent = instances["TextLabel2"]
+			instances["UICorner49"].Parent = instances["TextLabel2"]
 			instances["TextLabel2"].Parent = instances["ExampleMenuButton"]
 			instances["UIAspectRatioConstraint13"].Parent = instances["ExampleMenuButton"]
 			instances["Camera2"].Parent = instances["Frame4"]
-			instances["UICorner47"].Parent = instances["Frame4"]
+			instances["UICorner48"].Parent = instances["Frame4"]
 			instances["Frame4"].Parent = instances["ExampleMenuButton"]
-			instances["UICorner26"].Parent = instances["ExampleMenuButton"]
+			instances["UICorner27"].Parent = instances["ExampleMenuButton"]
 			instances["ExampleMenuButton"].Parent = instances["ScrollingFrame2"]
-			instances["UIListLayout3"].Parent = instances["ScrollingFrame2"]
+			instances["UIListLayout4"].Parent = instances["ScrollingFrame2"]
 			instances["ScrollingFrame2"].Parent = instances["objectsmenu"]
-			instances["UIPadding29"].Parent = instances["ScrollingFrame6"]
-			instances["UIStroke13"].Parent = instances["TextLabel8"]
-			instances["UICorner76"].Parent = instances["TextLabel8"]
-			instances["TextLabel8"].Parent = instances["ExampleModelButton"]
+			instances["UIPadding30"].Parent = instances["ScrollingFrame7"]
+			instances["UIStroke13"].Parent = instances["TextLabel9"]
+			instances["UICorner78"].Parent = instances["TextLabel9"]
+			instances["TextLabel9"].Parent = instances["ExampleModelButton"]
 			instances["UIAspectRatioConstraint32"].Parent = instances["ExampleModelButton"]
 			instances["Camera5"].Parent = instances["Frame7"]
-			instances["UICorner75"].Parent = instances["Frame7"]
+			instances["UICorner77"].Parent = instances["Frame7"]
 			instances["Frame7"].Parent = instances["ExampleModelButton"]
-			instances["UICorner69"].Parent = instances["ExampleModelButton"]
-			instances["ExampleModelButton"].Parent = instances["ScrollingFrame6"]
-			instances["UIListLayout14"].Parent = instances["ScrollingFrame6"]
-			instances["ScrollingFrame6"].Parent = instances["ExampleMenuFrame"]
+			instances["UICorner71"].Parent = instances["ExampleModelButton"]
+			instances["ExampleModelButton"].Parent = instances["ScrollingFrame7"]
+			instances["UIListLayout16"].Parent = instances["ScrollingFrame7"]
+			instances["ScrollingFrame7"].Parent = instances["ExampleMenuFrame"]
 			instances["ExampleMenuFrame"].Parent = instances["Menus"]
 			instances["Menus"].Parent = instances["objectsmenu"]
 			instances["UICorner2"].Parent = instances["objectsmenu"]
@@ -3678,30 +3777,30 @@ do
 			instances["objectsmenu"].Parent = instances["ScreenGui"]
 			instances["UIAspectRatioConstraint12"].Parent = instances["nativesettings"]
 			instances["add4"].Parent = instances["nativesettings"]
-			instances["UICorner25"].Parent = instances["nativesettings"]
+			instances["UICorner26"].Parent = instances["nativesettings"]
 			instances["nativesettings"].Parent = instances["ScrollingFrame"]
 			instances["UIPadding6"].Parent = instances["ScrollingFrame"]
 			instances["UIAspectRatioConstraint11"].Parent = instances["models"]
 			instances["Camera"].Parent = instances["Frame3"]
-			instances["UICorner46"].Parent = instances["Frame3"]
+			instances["UICorner47"].Parent = instances["Frame3"]
 			instances["Frame3"].Parent = instances["models"]
-			instances["UICorner24"].Parent = instances["models"]
+			instances["UICorner25"].Parent = instances["models"]
 			instances["models"].Parent = instances["ScrollingFrame"]
 			instances["UIAspectRatioConstraint10"].Parent = instances["settings"]
 			instances["add3"].Parent = instances["settings"]
-			instances["UICorner23"].Parent = instances["settings"]
+			instances["UICorner24"].Parent = instances["settings"]
 			instances["settings"].Parent = instances["ScrollingFrame"]
 			instances["UIAspectRatioConstraint9"].Parent = instances["material"]
 			instances["Part3"].Parent = instances["Model"]
 			instances["Model"].Parent = instances["Frame2"]
-			instances["UICorner45"].Parent = instances["Frame2"]
+			instances["UICorner46"].Parent = instances["Frame2"]
 			instances["Frame2"].Parent = instances["material"]
-			instances["UICorner22"].Parent = instances["material"]
+			instances["UICorner23"].Parent = instances["material"]
 			instances["material"].Parent = instances["ScrollingFrame"]
 			instances["UIAspectRatioConstraint8"].Parent = instances["color"]
-			instances["UICorner44"].Parent = instances["Frame"]
+			instances["UICorner45"].Parent = instances["Frame"]
 			instances["Frame"].Parent = instances["color"]
-			instances["UICorner21"].Parent = instances["color"]
+			instances["UICorner22"].Parent = instances["color"]
 			instances["color"].Parent = instances["ScrollingFrame"]
 			instances["selection2"].Parent = instances["tools"]
 			instances["rote2"].Parent = instances["tools"]
@@ -3713,9 +3812,9 @@ do
 			instances["destroy2"].Parent = instances["tools"]
 			instances["add2"].Parent = instances["tools"]
 			instances["none2"].Parent = instances["tools"]
-			instances["UICorner20"].Parent = instances["tools"]
+			instances["UICorner21"].Parent = instances["tools"]
 			instances["tools"].Parent = instances["ScrollingFrame"]
-			instances["UIListLayout2"].Parent = instances["ScrollingFrame"]
+			instances["UIListLayout3"].Parent = instances["ScrollingFrame"]
 			instances["ScrollingFrame"].Parent = instances["ToolBar"]
 			instances["UICorner"].Parent = instances["ToolBar"]
 			instances["ToolBar"].Parent = instances["ScreenGui"]
@@ -4232,7 +4331,7 @@ local RemotesSimplificados = (function()
 		Position:CFrame,
 		Color:BrickColor,
 		Material:Enum.Material
-	)
+	):Model
 		return BuildRemote:InvokeServer(
 			block,
 			Position,
@@ -4246,7 +4345,7 @@ local RemotesSimplificados = (function()
 		block:Model,
 		Color:BrickColor,
 		Material:Enum.Material
-	)
+	):nil		
 		return FillRemote:InvokeServer(
 			block,
 			Color,
@@ -4266,14 +4365,13 @@ local RemotesSimplificados = (function()
 		return DestroyRemote:InvokeServer(
 			block
 		)
-
 	end
 
 	function Functions.Resize(
 		block:Model,
 		Position:CFrame,
 		Size:Vector3
-	)
+	):boolean
 		local OriginalPosition = block:GetPivot()
 		local OriginalSize = block:GetExtentsSize()
 		block:PivotTo(Position)
@@ -4315,7 +4413,7 @@ local RemotesSimplificados = (function()
 	function Functions.Move(
 		block:Model,
 		Position:CFrame
-	)
+	):nil
 		return MoveRemote:InvokeServer(
 			block,
 			Position
@@ -5562,7 +5660,6 @@ do
 			Material:Enum.Material?,
 			IgnoreHitboxes:boolean?,
 			CreateUndo:boolean?,
-			ExtraExcluded:{Instance},
 			ConfigurationsFolder:Folder?
 		):Model?
 			if not Model then 
@@ -5570,69 +5667,66 @@ do
 				return
 			end
 
+			local TempClone = module.GenerateTempClone(Model,Cf,Size,Color,Material)
+
 			IgnoreHitboxes = IgnorePiggyHitboxs or IgnoreHitboxes
-			local SpaceOccuped = CheckIfPositionIsOccupied(Cf,(Size or Model:GetExtentsSize()),ExtraExcluded)
+			local SpaceOccuped = CheckIfPositionIsOccupied(Cf,(Size or Model:GetExtentsSize()),{TempClone})
 
-			--funcion para crear el bloque de forma individual
-			local function GenerateBlock()
-				local block,AnteriorCf = nil,nil
-				if SpaceOccuped and IgnoreHitboxes then
-					AnteriorCf = Cf or Model:GetPivot()
-					block = RemotesSimplificados.Build(Model,GenerateRandomPosition(Cf,(Size or Model:GetExtentsSize())),Color,Material)
-				elseif SpaceOccuped then
-					Notification.Notify("The space is occupied, enable IgnorePiggyHitboxs to avoid this ID:1.1.1",3,Color3.new(1, 0, 0.0156863))
-				else
-					block = RemotesSimplificados.Build(Model,Cf,Color,Material)
-				end
-
-				if block then
-					if Size and block:HasTag("Resizable") then
-						RemotesSimplificados.Resize(block,AnteriorCf or Cf,Size)
-					end
-					if AnteriorCf then
-						RemotesSimplificados.Move(block,AnteriorCf)
-					end
-					if ConfigurationsFolder and Configurations.CopiarConfiguracionesAlDuplicar then
-						local ThisConfigurationFolder = block:FindFirstChild("Configuration")
-						if ThisConfigurationFolder then
-
-
-							local children = ConfigurationsFolder:GetChildren()
-							local RealConfigurations = table.create(#children)
-
-							for i, child in ipairs(children) do
-								local value = child.Value
-								if typeof(value) == "Instance" and value:IsDescendantOf(ConfigurationsFolder) then
-									local ValueInThisConfigurations = ThisConfigurationFolder:FindFirstChild(child.Name)
-									value = ValueInThisConfigurations:FindFirstChild(value.Name)
-								end
-								RealConfigurations[child.Name] = value
-							end
-							RemotesSimplificados.SetSettings(block,RealConfigurations)
-
-
-						end
-					end
-					if CreateUndo then
-						local UndoInformation = CreateUndoObject()
-						UndoInformation.Type = "add"
-						UndoInformation.Changes = {table.clone(SelectedTargets),{
-							block,
-							Cf or block:GetPivot(),
-							Size or block:GetExtentsSize(),
-							Color or block:GetAttribute("Color"),
-							Material or block:GetAttribute("Material"),
-						}}
-						PushUndoObject(UndoInformation)
-					end
-				else
-					Notification.Notify("The server refused to add the block ID:1.1.1",3,Color3.new(1, 0, 0.0156863))
-				end
-
-				return block
+			local block,AnteriorCf = nil,nil
+			if SpaceOccuped and IgnoreHitboxes then
+				AnteriorCf = Cf or Model:GetPivot()
+				block = RemotesSimplificados.Build(Model,GenerateRandomPosition(Cf,(Size or Model:GetExtentsSize())),Color,Material)
+			elseif SpaceOccuped then
+				Notification.Notify("The space is occupied, enable IgnorePiggyHitboxs to avoid this ID:1.1.1",3,Color3.new(1, 0, 0.0156863))
+			else
+				block = RemotesSimplificados.Build(Model,Cf,Color,Material)
 			end
 
-			local block = GenerateBlock()
+			if block then
+
+				if Size and block:HasTag("Resizable") then
+					RemotesSimplificados.Resize(block,AnteriorCf or Cf,Size)
+				elseif AnteriorCf then
+					RemotesSimplificados.Move(block,AnteriorCf)
+				end
+				if ConfigurationsFolder and Configurations.CopiarConfiguracionesAlDuplicar then
+					local ThisConfigurationFolder = block:FindFirstChild("Configuration")
+					if ThisConfigurationFolder then
+
+
+						local children = ConfigurationsFolder:GetChildren()
+						local RealConfigurations = table.create(#children)
+
+						for i, child in ipairs(children) do
+							local value = child.Value
+							if typeof(value) == "Instance" and value:IsDescendantOf(ConfigurationsFolder) then
+								local ValueInThisConfigurations = ThisConfigurationFolder:FindFirstChild(child.Name)
+								value = ValueInThisConfigurations:FindFirstChild(value.Name)
+							end
+							RealConfigurations[child.Name] = value
+						end
+						RemotesSimplificados.SetSettings(block,RealConfigurations)
+
+
+					end
+				end
+				if CreateUndo then
+					local UndoInformation = CreateUndoObject()
+					UndoInformation.Type = "add"
+					UndoInformation.Changes = {table.clone(SelectedTargets),{
+						block,
+						Cf or block:GetPivot(),
+						Size or block:GetExtentsSize(),
+						Color or block:GetAttribute("Color"),
+						Material or block:GetAttribute("Material"),
+					}}
+					PushUndoObject(UndoInformation)
+				end
+			else
+				Notification.Notify("The server refused to add the block ID:1.1.1",3,Color3.new(1, 0, 0.0156863))
+			end
+			
+			TempClone:Destroy()
 
 			return block
 		end
@@ -5669,7 +5763,7 @@ do
 
 			UpdateActualTarget()
 
-			task.spawn(function()
+			task.defer(function()
 				RemotesSimplificados.Destroy(Model)
 				if UndoInformation then
 					PushUndoObject(UndoInformation)
@@ -5715,12 +5809,12 @@ do
 				)
 				PushUndoObject(UndoInformation)
 			end
-
-			if Cf then
-				RemotesSimplificados.Move(Model,Cf)
-			end
+			
+			module.ModificateModel(Model,Cf,Size,Color,Material)
 			if Size and Model:HasTag("Resizable") then
 				RemotesSimplificados.Resize(Model,Cf,Size)
+			elseif Cf then
+				RemotesSimplificados.Move(Model,Cf)
 			end
 			if Color or Material then
 				RemotesSimplificados.Fill(Model,Color or AnteriorColor,Material or AnteriorMaterial)
@@ -5934,7 +6028,7 @@ do
 					blockinformation[5],
 					child:FindFirstChild("Configuration")
 				}
-				task.spawn(function()
+				task.defer(function()
 					BuildFunctionsAdvanced.AdvancedDestroy(child,false)
 				end)
 				
@@ -5952,7 +6046,7 @@ do
 			local Max = #Changes
 			for i = 2,#Changes do
 				local child = Changes[i]
-				task.spawn(function()
+				task.defer(function()
 					local block = BuildFunctionsAdvanced.AdvancedBuild(
 						child[1], 
 						child[2], 
@@ -5961,7 +6055,6 @@ do
 						child[5],
 						true,
 						false,
-						nil,
 						child[6]
 					)
 					table.insert(builded,block)
@@ -5995,7 +6088,7 @@ do
 					O1:GetAttribute("Material")
 				}
 
-				task.spawn(function()
+				task.defer(function()
 					BuildFunctionsAdvanced.AdvancedModification(
 						O1,
 						blockinformation[2],
@@ -6046,7 +6139,7 @@ do
 			local Max = #Changes
 			for i, child in ipairs(Changes) do
 				if not child[1] then continue end
-				task.spawn(function()
+				task.defer(function()
 					local block = BuildFunctionsAdvanced.AdvancedBuild(
 						child[1], 
 						child[2], 
@@ -6055,7 +6148,6 @@ do
 						child[5],
 						true,
 						false,
-						nil,
 						child[6]
 					)
 
@@ -6082,7 +6174,7 @@ do
 			for i = #Changes,2,-1 do
 				local child = Changes[i]
 				if not child or not child.Parent then continue end
-				task.spawn(function()
+				task.defer(function()
 					BuildFunctionsAdvanced.AdvancedDestroy(child,false)
 				end)
 				RedoWaitObject:Wait()
@@ -6093,7 +6185,7 @@ do
 				local blockinformation = Changes[i]
 				local child = blockinformation[1]
 				if not child or not child.Parent then continue end
-				task.spawn(function()
+				task.defer(function()
 					BuildFunctionsAdvanced.AdvancedModification(
 						child,
 						blockinformation[2],
@@ -6147,7 +6239,7 @@ do
 				for i = #information,1,-1 do
 					local child = information[i]
 
-					task.spawn(function()
+					task.defer(function()
 						InformationOfEliminated[#InformationOfEliminated+1] = {
 							GetBlockType(child),
 							child:GetPivot(),
@@ -6196,7 +6288,7 @@ do
 				for i, child in ipairs(TableToSelect) do
 					EndedTableToSelect[i] = false
 					--task spawn para empezar la peticion
-					task.spawn(function()
+					task.defer(function()
 						
 						--conseguir la informacion y crear el bloque
 						local Pos = child:GetPivot()
@@ -6211,7 +6303,6 @@ do
 							material,
 							true,
 							false,
-							nil,
 							child:FindFirstChild("Configuration")
 						)
 						
@@ -6288,7 +6379,7 @@ do
 									local actualindex = index
 									Ended[actualindex] = false
 									
-									task.spawn(function()
+									task.defer(function()
 
 										-- =========================
 										-- HIJOS (Child connections)
@@ -6354,7 +6445,7 @@ do
 										index += 1
 										local actualindex = index
 										Ended2[actualindex] = false
-										task.spawn(function()
+										task.defer(function()
 											RemotesSimplificados.SetConnections(ParentLink, ParentConnections)
 											Ended2[actualindex] = true
 										end)
@@ -6566,14 +6657,7 @@ do
 			if not ActualClonedModel then return end
 
 			local Pos = ActualClonedModel:GetPivot()
-
-			local tempclone = BuildFunctionsAdvanced.GenerateTempClone(
-				ActualCreationModel,
-				Pos,
-				nil,
-				ActualBrickColor,
-				ActualMaterial
-			)
+			
 			UpdateActualTarget()
 			Upd()
 
@@ -6584,11 +6668,9 @@ do
 				ActualBrickColor,
 				ActualMaterial,
 				nil,
-				true,
-				{tempclone}
+				true
 			)
-			tempclone:Destroy()
-
+			
 			UpdateActualTarget()
 			Upd()
 		end
@@ -6802,7 +6884,7 @@ do
 							child:GetAttribute("Color"),
 							child:GetAttribute("Material"),
 						})
-						task.spawn(function()
+						task.defer(function()
 							BuildFunctionsAdvanced.AdvancedModification(
 								child,
 								child:GetPivot(),
@@ -6983,7 +7065,6 @@ do
 
 					PointToCursorUpd()
 				end))
-				PointToCursorUpd()
 
 				HandleJanitor:Add(UserInputService.InputBegan:Connect(function(Input)
 					if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
@@ -7001,12 +7082,17 @@ do
 
 				end))
 
+				HandleJanitor:Add(Events.ConfigurationIsChanged.Event:Connect(function(confid)
+					if confid ~= "ApuntarALaPosicionDelPuntero" then return end
+
+					upd()
+				end))
+
 				HandleJanitor:Add(UserInputService.InputEnded:Connect(function(Input)
-					if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+					if not (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then return end
 					if MouseEnabled then
 						task.spawn(UpdateToServer)
 					end
-
 					MouseEnabled = false
 				end))
 
@@ -7136,7 +7222,7 @@ do
 							child:GetAttribute("Color"),
 							child:GetAttribute("Material")
 						})
-						task.spawn(function()
+						task.defer(function()
 							BuildFunctionsAdvanced.AdvancedModification(
 								child,
 								child:GetPivot(),
@@ -7213,36 +7299,31 @@ do
 							local AxisInitialSize
 
 							if Face == Enum.NormalId.Right then
-								AxisInitialSize = InitialSize.X
+								AxisInitialSize = sizeBox.X
 							elseif Face == Enum.NormalId.Left then
-								AxisInitialSize = InitialSize.X
+								AxisInitialSize = sizeBox.X
 							elseif Face == Enum.NormalId.Top then
-								AxisInitialSize = InitialSize.Y
+								AxisInitialSize = sizeBox.Y
 							elseif Face == Enum.NormalId.Bottom then
-								AxisInitialSize = InitialSize.Y
+								AxisInitialSize = sizeBox.Y
 							elseif Face == Enum.NormalId.Back then
-								AxisInitialSize = InitialSize.Z
+								AxisInitialSize = sizeBox.Z
 							elseif Face == Enum.NormalId.Front then
-								AxisInitialSize = InitialSize.Z
+								AxisInitialSize = sizeBox.Z
 							end
 							AxisNewSize = AxisInitialSize + (distance*2)
-
-							if ActualToolGridState and ToolGrid > 0 then
-								AxisNewSize = SnapToGrid(AxisNewSize, ToolGrid)
-							end
-							
 							
 							local Calculo = (AxisNewSize / AxisInitialSize)
-							if Configurations.EstirarProporcionalmenteEnGrupo and #SelectedTargets > 1 then
+							if Configurations.EstirarProporcionalmenteEnGrupo then
 
 								for _, child in ipairs(SelectedTargets) do
-									local InitialScale = child:GetAttribute("InitialScale")
+									if child:HasTag("Resizable") then
+										ResizeModel(child,child:GetAttribute("InitialScale") * Calculo,true)
+									end
+									
 									local InitialCFrame = child:GetAttribute("InitialPosition")
 									
-									local NewScale = Calculo * InitialScale
-
 									-- Escalar tamaño
-									ResizeModel(child,nil,NewScale.X,NewScale.Y,NewScale.Z)
 									
 									local offset = InitialCFrame.Position - center
 									local newOffset = offset * Calculo
@@ -7253,10 +7334,9 @@ do
 								end
 							else
 								for i, child in ipairs(SelectedTargets) do
-									local InitialScale = child:GetAttribute("InitialScale")
-									local NewScale = Calculo*InitialScale
-
-									ResizeModel(child,nil,NewScale.X,NewScale.Y,NewScale.Z)
+									if child:HasTag("Resizable") then
+										ResizeModel(child,child:GetAttribute("InitialScale") * Calculo,true)
+									end
 								end
 							end
 						else
@@ -7274,10 +7354,70 @@ do
 								OffsetZ = distance
 							end
 
-							for i, child in ipairs(SelectedTargets) do
-								if not child:HasTag("Resizable") then continue end
-								local realInitialSize = child:GetAttribute("InitialSize")
-								ResizeModel(child,realInitialSize + Vector3.new(OffsetX,OffsetY,OffsetZ))
+							if Configurations.EstirarProporcionalmenteEnGrupo then
+								local AxisNewSize
+								local AxisInitialSize
+								local Calculo
+								local CalculoVector
+								local Axis = ""
+								if Face == Enum.NormalId.Right or Face == Enum.NormalId.Left then
+									AxisInitialSize = sizeBox.X
+									AxisNewSize = AxisInitialSize + (distance*2)
+									Calculo = (AxisNewSize / AxisInitialSize)
+									CalculoVector = Vector3.new(
+										Calculo,
+										1,
+										1
+									)
+									Axis = "X"
+								elseif Face == Enum.NormalId.Top or Face == Enum.NormalId.Bottom then
+									AxisInitialSize = sizeBox.Y
+									AxisNewSize = AxisInitialSize + (distance*2)
+									Calculo = (AxisNewSize / AxisInitialSize)
+									CalculoVector = Vector3.new(
+										1,
+										Calculo,
+										1
+									)
+									Axis = "Y"
+								elseif Face == Enum.NormalId.Back or Face == Enum.NormalId.Front then
+									AxisInitialSize = sizeBox.Z
+									AxisNewSize = AxisInitialSize + (distance*2)
+									Calculo = (AxisNewSize / AxisInitialSize)
+									CalculoVector = Vector3.new(
+										1,
+										1,
+										Calculo
+									)
+									Axis = "Z"
+								end
+								
+								for i, child in ipairs(SelectedTargets) do
+									if child:HasTag("Resizable") then 
+										ResizeModel(child,child:GetAttribute("InitialScale") * CalculoVector,true)
+									end
+									local InitialCFrame = child:GetAttribute("InitialPosition")
+									
+									local Center = {
+										X = InitialCFrame.X,
+										Y = InitialCFrame.Y,
+										Z = InitialCFrame.Z
+									}
+									Center[Axis] = center[Axis]
+									Center = Vector3.new(Center.X,Center.Y,Center.Z)
+
+									local offset = InitialCFrame.Position - Center
+									local newOffset = offset * Calculo
+									local newPosition = Center + newOffset
+
+									child:PivotTo(CFrame.new(newPosition) * InitialCFrame.Rotation)
+								end
+							else
+								for i, child in ipairs(SelectedTargets) do
+									if not child:HasTag("Resizable") then continue end
+									local realInitialSize = child:GetAttribute("InitialSize")
+									ResizeModel(child,realInitialSize + Vector3.new(OffsetX,OffsetY,OffsetZ))
+								end
 							end
 						end
 					else
@@ -7287,88 +7427,43 @@ do
 							local AxisNewSize
 							local AxisInitialSize
 
-							local NewPositionX = 0
-							local NewPositionY = 0
-							local NewPositionZ = 0
-
-							if Face == Enum.NormalId.Right then
-								AxisInitialSize = InitialSize.X
-								AxisNewSize = AxisInitialSize + distance
-								if AxisNewSize > 0 then
-									NewPositionX += distance/2
-								else
-									NewPositionX += -InitialSize.X/2
-								end
-							elseif Face == Enum.NormalId.Left then
-								AxisInitialSize = InitialSize.X
-								AxisNewSize = AxisInitialSize + distance
-								if AxisNewSize > 0 then
-									NewPositionX -= distance/2
-								else
-									NewPositionX -= -InitialSize.X/2
-								end
-							elseif Face == Enum.NormalId.Top then
-								AxisInitialSize = InitialSize.Y
-								AxisNewSize = AxisInitialSize + distance
-								if AxisNewSize > 0 then
-									NewPositionY += distance/2
-								else
-									NewPositionY += -InitialSize.Y/2
-								end
-							elseif Face == Enum.NormalId.Bottom then
-								AxisInitialSize = InitialSize.Y
-								AxisNewSize = AxisInitialSize + distance
-								if AxisNewSize > 0 then
-									NewPositionY -= distance/2
-								else
-									NewPositionY -= -InitialSize.Y/2
-								end
-							elseif Face == Enum.NormalId.Back then
-								AxisInitialSize = InitialSize.Z
-								AxisNewSize = AxisInitialSize + distance
-								if AxisNewSize > 0 then
-									NewPositionZ += distance/2
-								else
-									NewPositionZ += -InitialSize.Z/2
-								end
-							elseif Face == Enum.NormalId.Front then
-								AxisInitialSize = InitialSize.Z
-								AxisNewSize = AxisInitialSize + distance
-								if AxisNewSize > 0 then
-									NewPositionZ -= distance/2
-								else
-									NewPositionZ -= -InitialSize.Z/2
-								end
-							end
-
-							local Calculo = AxisNewSize / AxisInitialSize
 							if Configurations.EstirarProporcionalmenteEnGrupo then
-
-								local offset = Vector3.new()
-
+								local offset
 								if Face == Enum.NormalId.Right then
-									offset = Vector3.new(-InitialSize.X/2, 0, 0)
+									AxisInitialSize = sizeBox.X
+									AxisNewSize = AxisInitialSize + distance
+									offset = Vector3.new(-sizeBox.X/2, 0, 0)
 								elseif Face == Enum.NormalId.Left then
-									offset = Vector3.new(InitialSize.X/2, 0, 0)
+									AxisInitialSize = sizeBox.X
+									AxisNewSize = AxisInitialSize + distance
+									offset = Vector3.new(sizeBox.X/2, 0, 0)
 								elseif Face == Enum.NormalId.Top then
-									offset = Vector3.new(0, -InitialSize.Y/2, 0)
+									AxisInitialSize = sizeBox.Y
+									AxisNewSize = AxisInitialSize + distance
+									offset = Vector3.new(0, -sizeBox.Y/2, 0)
 								elseif Face == Enum.NormalId.Bottom then
-									offset = Vector3.new(0, InitialSize.Y/2, 0)
-								elseif Face == Enum.NormalId.Front then
-									offset = Vector3.new(0, 0, InitialSize.Z/2)
+									AxisInitialSize = sizeBox.Y
+									AxisNewSize = AxisInitialSize + distance
+									offset = Vector3.new(0, sizeBox.Y/2, 0)
 								elseif Face == Enum.NormalId.Back then
-									offset = Vector3.new(0, 0, -InitialSize.Z/2)
+									AxisInitialSize = sizeBox.Z
+									AxisNewSize = AxisInitialSize + distance
+									offset = Vector3.new(0, 0, -sizeBox.Z/2)
+								elseif Face == Enum.NormalId.Front then
+									AxisInitialSize = sizeBox.Z
+									AxisNewSize = AxisInitialSize + distance
+									offset = Vector3.new(0, 0, sizeBox.Z/2)
 								end
 
-								local ThisCenter = (InitialPosition * CFrame.new(offset)).Position
+								local Calculo = AxisNewSize / AxisInitialSize
+
+								local ThisCenter = ((CFrame.new(center)*InitialPosition.Rotation)*CFrame.new(offset)).Position
 
 								for i,child in ipairs(SelectedTargets) do
-									if not child:HasTag("Resizable") then continue end
-
-									local InitialScale = child:GetAttribute("InitialScale")
+									if child:HasTag("Resizable") then 
+										ResizeModel(child,Calculo*child:GetAttribute("InitialScale"),true)
+									end
 									local InitialCFrame = child:GetAttribute("InitialPosition")
-									local NewScale = Calculo*InitialScale
-									ResizeModel(child,nil,NewScale.X,NewScale.Y,NewScale.Z)
 
 									local offset = InitialCFrame.Position - ThisCenter
 									local newOffset = offset * Calculo
@@ -7378,58 +7473,188 @@ do
 									child:PivotTo(CFrame.new(newPosition) * InitialCFrame.Rotation)
 								end
 							else
+
+								local NewPositionX = 0
+								local NewPositionY = 0
+								local NewPositionZ = 0
+
+								if Face == Enum.NormalId.Right then
+									AxisInitialSize = InitialSize.X
+									AxisNewSize = AxisInitialSize + distance
+									if AxisNewSize > 0 then
+										NewPositionX += distance/2
+									else
+										NewPositionX += -InitialSize.X/2
+									end
+								elseif Face == Enum.NormalId.Left then
+									AxisInitialSize = InitialSize.X
+									AxisNewSize = AxisInitialSize + distance
+									if AxisNewSize > 0 then
+										NewPositionX -= distance/2
+									else
+										NewPositionX -= -InitialSize.X/2
+									end
+								elseif Face == Enum.NormalId.Top then
+									AxisInitialSize = InitialSize.Y
+									AxisNewSize = AxisInitialSize + distance
+									if AxisNewSize > 0 then
+										NewPositionY += distance/2
+									else
+										NewPositionY += -InitialSize.Y/2
+									end
+								elseif Face == Enum.NormalId.Bottom then
+									AxisInitialSize = InitialSize.Y
+									AxisNewSize = AxisInitialSize + distance
+									if AxisNewSize > 0 then
+										NewPositionY -= distance/2
+									else
+										NewPositionY -= -InitialSize.Y/2
+									end
+								elseif Face == Enum.NormalId.Back then
+									AxisInitialSize = InitialSize.Z
+									AxisNewSize = AxisInitialSize + distance
+									if AxisNewSize > 0 then
+										NewPositionZ += distance/2
+									else
+										NewPositionZ += -InitialSize.Z/2
+									end
+								elseif Face == Enum.NormalId.Front then
+									AxisInitialSize = InitialSize.Z
+									AxisNewSize = AxisInitialSize + distance
+									if AxisNewSize > 0 then
+										NewPositionZ -= distance/2
+									else
+										NewPositionZ -= -InitialSize.Z/2
+									end
+								end
+
+								local Calculo = AxisNewSize / AxisInitialSize
+								
 								for i, child in ipairs(SelectedTargets) do
-									if not child:HasTag("Resizable") then continue end
-									local InitialScale = child:GetAttribute("InitialScale")
-									local RealInitialPosition = child:GetAttribute("InitialPosition")
-									local NewScale = Calculo*InitialScale
-									ResizeModel(child,nil,NewScale.X,NewScale.Y,NewScale.Z)
-									child:PivotTo(RealInitialPosition * CFrame.new(
-										NewPositionX,
-										NewPositionY,
-										NewPositionZ
+									if child:HasTag("Resizable") then 
+										ResizeModel(child,Calculo*child:GetAttribute("InitialScale"),true)
+									end
+									child:PivotTo(child:GetAttribute("InitialPosition") * CFrame.new(
+										Vector3.new(
+											NewPositionX,
+											NewPositionY,
+											NewPositionZ
+										)
 										))
 								end
 							end
 						else
-
-							local NewPositionX = 0
-							local NewPositionY = 0
-							local NewPositionZ = 0
-							local OffsetX = 0
-							local OffsetY = 0
-							local OffsetZ = 0
-
-							if Face == Enum.NormalId.Right then
-								OffsetX = math.max(distance,-InitialSize.X+0.001)
-								NewPositionX = (OffsetX/2)
-							elseif Face == Enum.NormalId.Left then
-								OffsetX = math.max(distance,-InitialSize.X+0.001)
-								NewPositionX = -(OffsetX/2)
-							elseif Face == Enum.NormalId.Top then
-								OffsetY = math.max(distance,-InitialSize.Y+0.001)
-								NewPositionY = (OffsetY/2)
-							elseif Face == Enum.NormalId.Bottom then
-								OffsetY = math.max(distance,-InitialSize.Y+0.001)
-								NewPositionY = -(OffsetY/2)
-							elseif Face == Enum.NormalId.Back then
-								OffsetZ = math.max(distance,-InitialSize.Z+0.001)
-								NewPositionZ = (OffsetZ/2)
-							elseif Face == Enum.NormalId.Front then
-								OffsetZ = math.max(distance,-InitialSize.Z+0.001)
-								NewPositionZ = -(OffsetZ/2)
-							end
 							
-							for i, child in ipairs(SelectedTargets) do
-								if not child:HasTag("Resizable") then continue end
-								local RealInitialSize = child:GetAttribute("InitialSize")
-								if Configurations.EstirarProporcionalmenteEnGrupo then
-								else
+							if Configurations.EstirarProporcionalmenteEnGrupo then
+								local AxisNewSize
+								local AxisInitialSize
+								local Calculo
+								local CalculoVector
+								local Axis = ""
+								if Face == Enum.NormalId.Right or Face == Enum.NormalId.Left then
+									AxisInitialSize = sizeBox.X
+									AxisNewSize = AxisInitialSize + distance
+									Calculo = (AxisNewSize / AxisInitialSize)
+									CalculoVector = Vector3.new(
+										Calculo,
+										1,
+										1
+									)
+									Axis = "X"
+								elseif Face == Enum.NormalId.Top or Face == Enum.NormalId.Bottom then
+									AxisInitialSize = sizeBox.Y
+									AxisNewSize = AxisInitialSize + distance
+									Calculo = (AxisNewSize / AxisInitialSize)
+									CalculoVector = Vector3.new(
+										1,
+										Calculo,
+										1
+									)
+									Axis = "Y"
+								elseif Face == Enum.NormalId.Back or Face == Enum.NormalId.Front then
+									AxisInitialSize = sizeBox.Z
+									AxisNewSize = AxisInitialSize + distance
+									Calculo = (AxisNewSize / AxisInitialSize)
+									CalculoVector = Vector3.new(
+										1,
+										1,
+										Calculo
+									)
+									Axis = "Z"
 								end
-								child:PivotTo(child:GetAttribute("InitialPosition") * CFrame.new(NewPositionX,NewPositionY,NewPositionZ))
-								ResizeModel(child,RealInitialSize + Vector3.new(OffsetX,OffsetY,OffsetZ))
+								local offset
+								if Face == Enum.NormalId.Right then
+									offset = Vector3.new(-sizeBox.X/2, 0, 0)
+								elseif Face == Enum.NormalId.Left then
+									offset = Vector3.new(sizeBox.X/2, 0, 0)
+								elseif Face == Enum.NormalId.Top then
+									offset = Vector3.new(0, -sizeBox.Y/2, 0)
+								elseif Face == Enum.NormalId.Bottom then
+									offset = Vector3.new(0, sizeBox.Y/2, 0)
+								elseif Face == Enum.NormalId.Back then
+									offset = Vector3.new(0, 0, -sizeBox.Z/2)
+								elseif Face == Enum.NormalId.Front then
+									offset = Vector3.new(0, 0, sizeBox.Z/2)
+								end
+								local ThisCenter = ((CFrame.new(center)*InitialPosition.Rotation)*CFrame.new(offset)).Position
+
+								for i, child in ipairs(SelectedTargets) do
+									if child:HasTag("Resizable") then 
+										ResizeModel(child,child:GetAttribute("InitialScale") * CalculoVector,true)
+									end
+									local InitialCFrame = child:GetAttribute("InitialPosition")
+
+									local Center = {
+										X = InitialCFrame.X,
+										Y = InitialCFrame.Y,
+										Z = InitialCFrame.Z
+									}
+									Center[Axis] = ThisCenter[Axis]
+									Center = Vector3.new(Center.X,Center.Y,Center.Z)
+
+
+									local offset = InitialCFrame.Position - Center
+									local newOffset = offset * Calculo
+									local newPosition = Center + newOffset
+
+									child:PivotTo(CFrame.new(newPosition) * InitialCFrame.Rotation)
+								end
+							else
+								local NewPositionX = 0
+								local NewPositionY = 0
+								local NewPositionZ = 0
+								local OffsetX = 0
+								local OffsetY = 0
+								local OffsetZ = 0
+
+								if Face == Enum.NormalId.Right then
+									OffsetX = math.max(distance,-InitialSize.X+0.001)
+									NewPositionX = (OffsetX/2)
+								elseif Face == Enum.NormalId.Left then
+									OffsetX = math.max(distance,-InitialSize.X+0.001)
+									NewPositionX = -(OffsetX/2)
+								elseif Face == Enum.NormalId.Top then
+									OffsetY = math.max(distance,-InitialSize.Y+0.001)
+									NewPositionY = (OffsetY/2)
+								elseif Face == Enum.NormalId.Bottom then
+									OffsetY = math.max(distance,-InitialSize.Y+0.001)
+									NewPositionY = -(OffsetY/2)
+								elseif Face == Enum.NormalId.Back then
+									OffsetZ = math.max(distance,-InitialSize.Z+0.001)
+									NewPositionZ = (OffsetZ/2)
+								elseif Face == Enum.NormalId.Front then
+									OffsetZ = math.max(distance,-InitialSize.Z+0.001)
+									NewPositionZ = -(OffsetZ/2)
+								end
+								for i, child in ipairs(SelectedTargets) do
+									if child:HasTag("Resizable") then 
+										ResizeModel(child,child:GetAttribute("InitialSize") + Vector3.new(OffsetX,OffsetY,OffsetZ))
+									end
+									child:PivotTo(child:GetAttribute("InitialPosition") * CFrame.new(NewPositionX,NewPositionY,NewPositionZ))
+								end
 							end
 						end
+						
 					end
 
 					UIFuncs.OpenExtraInformation()
@@ -7547,7 +7772,7 @@ do
 							child:GetAttribute("Color"),
 							child:GetAttribute("Material")
 						})
-						task.spawn(function()
+						task.defer(function()
 							BuildFunctionsAdvanced.AdvancedModification(
 								child,
 								child:GetPivot(),
@@ -9433,6 +9658,42 @@ do
 
 		return module
 
+	end)()
+	
+	local MenuDesplegable = (function()
+		local module = {}
+		
+		local MenuEmergentesFrame = ScreenGui.MenuEmergentes
+
+		local MenuDesplegableTemplate = MenuEmergentesFrame:FindFirstChild("MenuExample")
+		MenuDesplegableTemplate.Visible = true
+		MenuDesplegableTemplate.Parent = nil
+		screenGuiJanitor:Add(MenuDesplegableTemplate)
+		
+		function module.CreateMenu(Title:string,Description:string)
+			local Menu = MenuDesplegableTemplate:Clone()
+			Menu.Parent = MenuEmergentesFrame
+			screenGuiJanitor:Add(
+				UIFuncs.AddMenuRemover(Menu).MouseButton1Up:Connect(function()
+					Menu:Destroy()
+				end)
+			)
+			UIFuncs.AddMenuResizer(Menu)
+			
+			local ScroolFrame = Menu:FindFirstChild("ScrollingFrame") :: ScrollingFrame
+			local MenuTitle = ScroolFrame:FindFirstChild("Information") :: Frame
+			MenuTitle.TextLabel.Text = Title
+			UIFuncs.SetExtraInformationMessage(MenuTitle,Description)
+			
+			local MenuConn = {}
+			
+			MenuConn.Builder  = {}
+			
+			return MenuConn
+			
+		end
+		
+		return module
 	end)()
 
 	--Tools menu
