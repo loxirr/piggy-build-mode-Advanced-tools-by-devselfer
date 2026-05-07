@@ -351,9 +351,9 @@ local Pooling = (function()
 		end
 
 		-- Sin índice: append directo, O(1) — sin shifting
-		local idx: number = #self.Arrays + 1
+		self.ActualArray += 1
+		local idx: number = self.ActualArray
 		self.Arrays[idx] = Array
-		self.ActualArray = idx
 
 		AdvancedDebugPrint(self.DebugState,
 			"AddArray-Pooling",
@@ -7271,20 +7271,13 @@ do
 			end
 			AnteriorTarget = ActualTargetingCicloPasado
 			NewTarget = ActualTargeting
-			table.clear(ActualTarget)
-			ActualTarget[1] = ActualTargeting
-			ActualTarget[2] = Raycast
-			ActualTarget[3] = AnteriorTarget
-			ActualTarget[4] = NewTarget
-			ActualTarget[5] = LastRaycasting
-		else
-			table.clear(ActualTarget)
-			ActualTarget[1] = ActualTargeting
-			ActualTarget[2] = Raycast
-			ActualTarget[3] = AnteriorTarget
-			ActualTarget[4] = NewTarget
-			ActualTarget[5] = LastRaycasting
 		end
+		
+		ActualTarget[1] = ActualTargeting
+		ActualTarget[2] = Raycast
+		ActualTarget[3] = AnteriorTarget
+		ActualTarget[4] = NewTarget
+		ActualTarget[5] = LastRaycasting
 	end
 
 	local boxJanitor = Janitor.new("box janitor")
